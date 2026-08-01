@@ -1,0 +1,14 @@
+.DS_Store
+.git/
+.github/
+docs/
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+apps/frontend/.env*
+target/
+*.log

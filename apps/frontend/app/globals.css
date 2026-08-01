@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-positive: var(--positive);
+}
+
+:root {
+  --background: 240 12% 4%;
+  --foreground: 220 14% 92%;
+  --card: 240 10% 7%;
+  --card-foreground: 220 14% 92%;
+  --muted: 240 8% 12%;
+  --muted-foreground: 220 8% 60%;
+  --border: 240 8% 16%;
+  --primary: 262 80% 62%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 262 40% 18%;
+  --accent-foreground: 262 80% 82%;
+  --destructive: 0 72% 55%;
+  --positive: 152 62% 48%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
+  background-size: 48px 48px;
+}

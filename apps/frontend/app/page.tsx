@@ -2,227 +2,210 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { TrendingUp, ShieldCheck, Target, Wallet } from "lucide-react";
+import { ArrowRight, Landmark, ShieldCheck, Target, TrendingUp, Users, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatApy, formatPct, formatUsd } from "@/lib/format";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatApy, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  sub?: string;
-}) {
+function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <Card>
-      <CardContent className="flex items-start justify-between p-5">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold">{value}</p>
-          {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-        </div>
+      <CardContent className="flex items-center gap-4 p-5">
         <div className="rounded-md bg-accent p-2 text-accent-foreground">
           <Icon className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="text-xl font-semibold">{value}</p>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-export default function InvestorPage() {
+export default function HomePage() {
   const { data: vaults } = useQuery({ queryKey: ["vaults"], queryFn: api.vaults });
   const { data: managers } = useQuery({ queryKey: ["managers"], queryFn: api.managers });
-  const { data: performance } = useQuery({
-    queryKey: ["perf", "mgr_quantum"],
-    queryFn: () => api.managerPerformance("mgr_quantum"),
-  });
-
-  function sharePrice(vault: { tvl: number; sharesOutstanding: number }) {
-    return vault.sharesOutstanding > 0
-      ? `$${(vault.tvl / vault.sharesOutstanding).toFixed(4)}`
-      : "—";
-  }
+  const { data: strategies } = useQuery({ queryKey: ["strategies"], queryFn: api.strategies });
 
   const totalTvl = vaults?.reduce((acc, v) => acc + v.tvl, 0) ?? 0;
-  const weightedApy = vaults?.length
-    ? vaults.reduce((acc, v) => acc + v.apy * v.tvl, 0) / totalTvl
-    : 0;
+  const activeManagers = (managers ?? []).filter((m) => m.status === "active");
+  const topVaults = [...(vaults ?? [])].sort((a, b) => b.tvl - a.tvl).slice(0, 3);
+  const topManagers = [...(managers ?? [])].sort((a, b) => b.score.total - a.score.total).slice(0, 3);
 
   return (
-    <div className="space-y-8">
-      <section className="bg-grid rounded-2xl border p-8">
-        <Badge variant="outline" className="mb-4">
-          Decentralized liquidity management
+    <div className="space-y-16">
+      <section className="bg-grid rounded-2xl border px-6 py-16 text-center sm:px-12">
+        <Badge variant="outline" className="mb-6">
+          Solana-native · on-chain verified
         </Badge>
-        <h1 className="max-w-2xl text-3xl font-semibold tracking-tight">
-          Your capital, allocated to the best LP managers on-chain.
+        <h1 className="mx-auto max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
+          The operating system for professional liquidity providers
         </h1>
-        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-          Atlas never predicts markets and never creates yield. It allocates capital intelligently
-          to verified managers ranked by transparent performance.
+        <p className="mx-auto mt-4 max-w-2xl text-sm text-muted-foreground sm:text-base">
+          Atlas allocates your capital to verified LP managers on Solana. Managers are ranked by
+          transparent, on-chain performance — never by marketing. Every allocation is enforced by a
+          risk engine with automatic circuit breakers.
         </p>
-        <div className="mt-6 flex gap-3">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/invest">
+            <Button size="lg">
+              Start investing <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
           <Link href="/strategies">
-            <Button>Explore Strategies</Button>
+            <Button size="lg" variant="outline">
+              Explore strategies
+            </Button>
           </Link>
           <Link href="/leaderboard">
-            <Button variant="outline">View Leaderboard</Button>
+            <Button size="lg" variant="ghost">
+              View leaderboard
+            </Button>
           </Link>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Wallet} label="Total TVL" value={formatUsd(totalTvl)} sub="across all vaults" />
-        <StatCard icon={TrendingUp} label="Weighted APY" value={formatApy(weightedApy)} sub="risk-adjusted" />
-        <StatCard icon={Target} label="Active Managers" value={String(managers?.filter((m) => m.status === "active").length ?? 0)} />
-        <StatCard icon={ShieldCheck} label="Cash Reserve" value={formatPct(0.1)} sub="protocol default" />
-      </section>
-
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Portfolio Performance</CardTitle>
-            <CardDescription>Net asset value, last 90 days</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={performance?.series} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="nav" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(262 80% 62%)" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="hsl(262 80% 62%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="timestamp" hide />
-                  <YAxis domain={["dataMin", "dataMax"]} hide />
-                  <Tooltip
-                    contentStyle={{ background: "hsl(240 10% 7%)", border: "1px solid hsl(240 8% 16%)", borderRadius: 8 }}
-                    labelFormatter={(ts) => new Date(Number(ts)).toLocaleDateString()}
-                    formatter={(value) => formatUsd(Number(value))}
-                  />
-                  <Area type="monotone" dataKey="tvl" stroke="hsl(262 80% 62%)" fill="url(#nav)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation</CardTitle>
-            <CardDescription>How capital is distributed</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {(vaults ?? []).slice(0, 4).map((vault, i) => {
-              const share = totalTvl > 0 ? vault.tvl / totalTvl : 0;
-              return (
-                <div key={vault.address}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span>{vault.name}</span>
-                    <span className="text-muted-foreground">{formatPct(share)}</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{ width: `${share * 100}%` }}
-                    />
-                  </div>
-                  {i === (vaults?.length ?? 0) - 1 && (
-                    <div className="mt-1 text-right text-xs text-muted-foreground">
-                      10% cash reserve
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+        <Stat icon={Wallet} label="Protocol TVL" value={formatUsd(totalTvl)} />
+        <Stat icon={Users} label="Active Managers" value={String(activeManagers.length)} />
+        <Stat icon={Target} label="Live Strategies" value={String(strategies?.length ?? 0)} />
+        <Stat
+          icon={TrendingUp}
+          label="Weighted APY"
+          value={
+            vaults?.length
+              ? formatApy(vaults.reduce((acc, v) => acc + v.apy * v.tvl, 0) / Math.max(1, totalTvl))
+              : "—"
+          }
+        />
       </section>
 
       <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Vaults</h2>
-          <span className="text-sm text-muted-foreground">oracle-priced shares</span>
+        <h2 className="text-2xl font-semibold tracking-tight">How Atlas works</h2>
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            {
+              title: "Deposit into vaults",
+              body: "Connect your wallet and deposit into a vault. You receive oracle-priced shares instantly.",
+            },
+            {
+              title: "Capital is allocated by score",
+              body: "An allocation engine weights every manager by score, risk, drawdown, consistency and track record.",
+            },
+            {
+              title: "Risk rules run automatically",
+              body: "A risk engine monitors VaR, concentration, oracle health and liquidity. Violations trigger reallocation or a circuit-breaker pause.",
+            },
+          ].map((step, i) => (
+            <Card key={step.title}>
+              <CardContent className="p-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Step {i + 1}</p>
+                <h3 className="mt-2 font-semibold">{step.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vault</TableHead>
-                <TableHead>Base</TableHead>
-                <TableHead>TVL</TableHead>
-                <TableHead>APY</TableHead>
-                <TableHead>Share price</TableHead>
-                <TableHead>Shares</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(vaults ?? []).map((vault) => (
-                <TableRow key={vault.address}>
-                  <TableCell className="font-medium">{vault.name}</TableCell>
-                  <TableCell>{vault.baseAsset}</TableCell>
-                  <TableCell>{formatUsd(vault.tvl)}</TableCell>
-                  <TableCell className="text-positive">{formatApy(vault.apy)}</TableCell>
-                  <TableCell>{sharePrice(vault)}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatUsd(vault.sharesOutstanding)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
       </section>
 
       <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Top Managers</h2>
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Featured vaults</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Top vaults by assets under management</p>
+          </div>
+          <Link href="/invest" className="text-sm text-primary hover:underline">
+            All vaults
+          </Link>
+        </div>
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {topVaults.map((vault) => {
+            const manager = (managers ?? []).find((m) => m.id === vault.managerId);
+            return (
+              <Card key={vault.address} className="transition-colors hover:border-primary/50">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold">{vault.name}</h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {vault.baseAsset} · managed by {manager?.name ?? "Atlas"}
+                      </p>
+                    </div>
+                    <Badge variant="positive">{formatApy(vault.apy)} APY</Badge>
+                  </div>
+                  <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">TVL</dt>
+                      <dd className="font-semibold">{formatUsd(vault.tvl)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Min deposit</dt>
+                      <dd className="font-semibold">{formatUsd(vault.minDeposit)}</dd>
+                    </div>
+                  </dl>
+                  <Link href={`/invest?vault=${encodeURIComponent(vault.address)}`} className="mt-5 block">
+                    <Button variant="outline" className="w-full">
+                      Invest <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Top managers</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Ranked by the on-chain weighted score</p>
+          </div>
           <Link href="/leaderboard" className="text-sm text-primary hover:underline">
             Full leaderboard
           </Link>
         </div>
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Manager</TableHead>
-                <TableHead>Score</TableHead>
-                <TableHead>TVL</TableHead>
-                <TableHead>Max Drawdown</TableHead>
-                <TableHead>Bonded</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(managers ?? []).slice(0, 5).map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell>
-                    <Link href={`/manager/${m.id}`} className="font-medium hover:text-primary">
-                      {m.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={m.score.total >= 75 ? "positive" : "outline"}>{m.score.total}</Badge>
-                  </TableCell>
-                  <TableCell>{formatUsd(m.tvl)}</TableCell>
-                  <TableCell>{formatPct(m.maxDrawdown)}</TableCell>
-                  <TableCell>{formatUsd(m.bondAmount)}</TableCell>
-                  <TableCell>
-                    <Badge variant={m.status === "active" ? "positive" : "destructive"}>{m.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {topManagers.map((m) => (
+            <Link key={m.id} href={`/manager/${m.id}`} className="group">
+              <Card className="h-full transition-colors hover:border-primary/50">
+                <CardContent className="flex items-center justify-between p-6">
+                  <div>
+                    <p className="font-semibold group-hover:text-primary">{m.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {m.protocolsUsed.join(", ")}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-semibold text-primary">{m.score.total}</p>
+                    <p className="text-xs text-muted-foreground">{formatUsd(m.tvl)} managed</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border bg-accent/30 p-10 text-center">
+        <Landmark className="mx-auto h-8 w-8 text-primary" />
+        <h2 className="mx-auto mt-4 max-w-xl text-2xl font-semibold tracking-tight">
+          Atlas does not predict markets and does not create yield. It allocates to managers who do.
+        </h2>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
+          Manager bonds are slashed for provable misconduct — never for a bad quarter. Poor
+          performance is managed by automatic de-allocation and the circuit breaker.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Link href="/protocol">
+            <Button variant="outline">
+              <ShieldCheck className="h-4 w-4" /> Read the risk model
+            </Button>
+          </Link>
+        </div>
       </section>
     </div>
   );

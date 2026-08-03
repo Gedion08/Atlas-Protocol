@@ -1,4 +1,7 @@
 import type {
+  DepositInput,
+  InvestorPosition,
+  InvestorSummary,
   LeaderboardEntry,
   ManagerPerformance,
   ManagerProfile,
@@ -6,6 +9,7 @@ import type {
   Strategy,
   StrategyUpload,
   Vault,
+  WithdrawInput,
 } from "atlas-types";
 
 export interface AtlasClientOptions {
@@ -139,6 +143,56 @@ export class AtlasClient {
 
   async getLeaderboard(): Promise<LeaderboardEntry[]> {
     return this.request<LeaderboardEntry[]>("/api/v1/leaderboard");
+  }
+
+  async getInvestorPositions(wallet: string): Promise<InvestorPosition[]> {
+    return this.request<InvestorPosition[]>(
+      `/api/v1/investors/${encodeURIComponent(wallet)}/positions`,
+    );
+  }
+
+  async getInvestorSummary(wallet: string): Promise<InvestorSummary | null> {
+    return this.request<InvestorSummary | null>(
+      `/api/v1/investors/${encodeURIComponent(wallet)}`,
+    );
+  }
+
+  /**
+   * Deposits base assets into a vault. The caller's wallet signs the exact
+   * request body (spec §7.1); the server mints priced shares and updates TVL.
+   */
+  async deposit(vaultAddress: string, input: DepositInput, signer: WalletSigner): Promise<{ position: InvestorPosition; vault: Vault }> {
+    return this.signedPost(`/api/v1/vaults/${encodeURIComponent(vaultAddress)}/deposit`, input, signer);
+  }
+
+  /** Redeems vault shares. The caller's wallet signs the request body. */
+  async withdraw(
+    vaultAddress: string,
+    input: WithdrawInput,
+    signer: WalletSigner,
+  ): Promise<{ position: InvestorPosition; proceeds: number; sharesRedeemed: number; vault: Vault }> {
+    return this.signedPost(`/api/v1/vaults/${encodeURIComponent(vaultAddress)}/withdraw`, input, signer);
+  }
+
+  private async signedPost<T>(
+    path: string,
+    body: unknown,
+    signer: WalletSigner,
+  ): Promise<T> {
+    const nonce = newNonce();
+    const payloadSha256 = await sha256Hex(JSON.stringify(body));
+    const message = buildAuthMessage({ owner: signer.publicKey, nonce, payloadSha256 });
+    const signature = await signer.signMessage(message);
+    return this.request<T>(path, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-atlas-owner": signer.publicKey,
+        "x-atlas-nonce": nonce,
+        "x-atlas-signature": signature,
+      },
+      body: JSON.stringify(body),
+    });
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {

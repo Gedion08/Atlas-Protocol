@@ -13,6 +13,24 @@ export function formatApy(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+export function formatNumber(value: number, digits = 2): string {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+export function formatBps(bps: number): string {
+  return `${(bps / 100).toFixed(2)}%`;
+}
+
+export function formatCompact(value: number): string {
+  if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return `${value.toFixed(2)}`;
+}
+
 export function formatAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }

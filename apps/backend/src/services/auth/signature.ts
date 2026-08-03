@@ -45,6 +45,51 @@ export function verifyWalletSignature(args: {
   }
 }
 
+export type SignedRequestResult =
+  | { ok: true }
+  | { ok: false; error: string; message: string; statusCode: number };
+
+export interface SignedRequestDeps {
+  nonces: NonceStore;
+  ownerHeader: string | undefined;
+  nonceHeader: string | undefined;
+  signatureHeader: string | undefined;
+  body: unknown;
+  expectedOwner: string;
+}
+
+/**
+ * Authenticates a wallet-signed request (spec §7.1): the client signs the
+ * canonical auth message over the exact request-body JSON, so the server
+ * re-derives it from the parsed body. `owner` must match the caller's public
+ * key; nonces are single-use and expire after 5 minutes. Used by strategy
+ * uploads and vault deposits/withdrawals.
+ */
+export function requireWalletSignature(deps: SignedRequestDeps): SignedRequestResult {
+  const { ownerHeader, nonceHeader, signatureHeader, body } = deps;
+  if (!ownerHeader || !nonceHeader || !signatureHeader) {
+    return {
+      ok: false,
+      error: "missing_signature_headers",
+      message: "x-atlas-owner, x-atlas-nonce and x-atlas-signature headers are required",
+      statusCode: 401,
+    };
+  }
+  if (ownerHeader !== deps.expectedOwner) {
+    return { ok: false, error: "signer_mismatch", message: "Signer is not the expected wallet", statusCode: 403 };
+  }
+  if (!deps.nonces.isFresh(nonceHeader)) {
+    return { ok: false, error: "stale_or_reused_nonce", message: "Nonce expired or already used", statusCode: 400 };
+  }
+  const payloadSha256 = sha256Hex(JSON.stringify(body));
+  const message = buildAuthMessage({ owner: ownerHeader, nonce: nonceHeader, payloadSha256 });
+  if (!verifyWalletSignature({ owner: ownerHeader, signature: signatureHeader, message })) {
+    return { ok: false, error: "invalid_signature", message: "Signature verification failed", statusCode: 401 };
+  }
+  deps.nonces.consume(nonceHeader);
+  return { ok: true };
+}
+
 /** Single-use nonce registry with TTL eviction (per-instance; Redis for multi-node). */
 export class NonceStore {
   private readonly seen = new Map<string, number>();

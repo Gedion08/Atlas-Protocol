@@ -1,6 +1,8 @@
 import type {
+  DepositInput,
   GovernanceProposal,
   GovernanceVote,
+  InvestorPosition,
   LeaderboardEntry,
   ManagerPerformance,
   ManagerProfile,
@@ -35,6 +37,20 @@ export interface StrategyRepository {
 export interface VaultRepository {
   list(): Promise<Vault[]>;
   get(address: string): Promise<Vault | null>;
+  update(vault: Vault): Promise<Vault>;
+}
+
+export interface InvestorRepository {
+  listPositions(investor: string): Promise<InvestorPosition[]>;
+  getPosition(id: string): Promise<InvestorPosition | null>;
+  /** Mints vault shares against the vault's current share price. */
+  deposit(vault: Vault, input: DepositInput): Promise<InvestorPosition>;
+  /** Redeems shares at the current share price; returns proceeds and shares redeemed. */
+  withdraw(
+    positionId: string,
+    vault: Vault,
+    shares: number,
+  ): Promise<{ position: InvestorPosition; proceeds: number; sharesRedeemed: number } | null>;
 }
 
 export interface OracleRepository {
@@ -55,6 +71,7 @@ export interface Repositories {
   managers: ManagerRepository;
   strategies: StrategyRepository;
   vaults: VaultRepository;
+  investors: InvestorRepository;
   oracle: OracleRepository;
   governance: GovernanceRepository;
 }
@@ -321,6 +338,70 @@ export class InMemoryVaultRepository implements VaultRepository {
   async get(address: string): Promise<Vault | null> {
     return this.vaults.find((v) => v.address === address) ?? null;
   }
+
+  async update(vault: Vault): Promise<Vault> {
+    const index = this.vaults.findIndex((v) => v.address === vault.address);
+    if (index >= 0) this.vaults[index] = vault;
+    return vault;
+  }
+}
+
+function round6(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+export class InMemoryInvestorRepository implements InvestorRepository {
+  constructor(
+    private readonly positions: InvestorPosition[] = [],
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  async listPositions(investor: string): Promise<InvestorPosition[]> {
+    return this.positions
+      .filter((p) => p.investor === investor)
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async getPosition(id: string): Promise<InvestorPosition | null> {
+    return this.positions.find((p) => p.id === id) ?? null;
+  }
+
+  async deposit(vault: Vault, input: DepositInput): Promise<InvestorPosition> {
+    const sharePrice =
+      vault.sharesOutstanding > 0 ? vault.tvl / vault.sharesOutstanding : 1;
+    const shares = round6(input.amount / sharePrice);
+    const position: InvestorPosition = {
+      id: `pos_${input.investor.slice(0, 8)}_${randomSuffix()}`,
+      investor: input.investor,
+      vaultAddress: vault.address,
+      strategyId: input.strategyId,
+      amount: input.amount,
+      shares,
+      sharePrice,
+      status: "active",
+      createdAt: this.now(),
+    };
+    this.positions.push(position);
+    return position;
+  }
+
+  async withdraw(
+    positionId: string,
+    vault: Vault,
+    shares: number,
+  ): Promise<{ position: InvestorPosition; proceeds: number; sharesRedeemed: number } | null> {
+    const position = this.positions.find((p) => p.id === positionId);
+    if (!position || position.status !== "active" || position.vaultAddress !== vault.address) {
+      return null;
+    }
+    const sharePrice =
+      vault.sharesOutstanding > 0 ? vault.tvl / vault.sharesOutstanding : position.sharePrice;
+    const sharesRedeemed = Math.min(round6(shares), position.shares);
+    const proceeds = round6(sharesRedeemed * sharePrice);
+    position.shares = round6(position.shares - sharesRedeemed);
+    if (position.shares <= 0) position.status = "withdrawn";
+    return { position, proceeds, sharesRedeemed };
+  }
 }
 
 export function createMemoryRepositories(
@@ -330,6 +411,7 @@ export function createMemoryRepositories(
     managers: new InMemoryManagerRepository(seedManagers, timeSeries),
     strategies: new InMemoryStrategyRepository(seedStrategies),
     vaults: new InMemoryVaultRepository(seedVaults),
+    investors: new InMemoryInvestorRepository(),
     oracle: new InMemoryOracleRepository(),
     governance: new InMemoryGovernanceRepository(seedProposals, seedLocks),
   };

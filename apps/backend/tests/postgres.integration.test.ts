@@ -39,6 +39,7 @@ describeIfPostgres("Postgres integration (schema + connectivity)", () => {
     expect(names).toContain("proposals");
     expect(names).toContain("proposal_votes");
     expect(names).toContain("ve_locks");
+    expect(names).toContain("investor_positions");
     // time_series is managed by PgTimeSeriesStore (in-memory default; Postgres impl optional)
   });
 

@@ -10,6 +10,7 @@ import { registerVaultRoutes } from "./routes/vaults.js";
 import { registerManagerRoutes } from "./routes/managers.js";
 import { registerStrategyRoutes } from "./routes/strategies.js";
 import { registerLeaderboardRoutes } from "./routes/leaderboard.js";
+import { registerInvestorRoutes } from "./routes/investors.js";
 import { registerOracleRoutes } from "./routes/oracle.js";
 import { registerGovernanceRoutes } from "./routes/governance.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
@@ -137,6 +138,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       servers: [{ url: serverUrl }],
       tags: [
         { name: "vaults", description: "Investor vaults" },
+        { name: "investors", description: "Investor positions and deposits" },
         { name: "managers", description: "LP managers and scoring" },
         { name: "strategies", description: "Strategy marketplace" },
         { name: "leaderboard", description: "Manager rankings" },
@@ -153,6 +155,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   app.register(async (scoped) => {
     scoped.register(async (r) => registerHealthRoutes(r, repositories, env));
     scoped.register(async (r) => registerVaultRoutes(r, repositories));
+    scoped.register(async (r) => registerInvestorRoutes(r, repositories));
     scoped.register(async (r) => registerManagerRoutes(r, repositories));
     scoped.register(async (r) => registerStrategyRoutes(r, repositories));
     scoped.register(async (r) => registerLeaderboardRoutes(r, repositories));

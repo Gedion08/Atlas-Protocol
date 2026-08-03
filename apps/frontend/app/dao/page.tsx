@@ -2,22 +2,27 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Landmark, ShieldCheck, Users, Vote } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import type { ProposalClass, ProposalInput } from "atlas-types";
 
 const inputClass =
   "w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary";
 
-const CLASSES: { value: ProposalClass; label: string }[] = [
-  { value: "parametric", label: "Parametric" },
-  { value: "fiscal", label: "Fiscal" },
-  { value: "protocol_critical", label: "Protocol critical" },
-  { value: "constitutional", label: "Constitutional" },
+const CLASSES: { value: ProposalClass; label: string; description: string }[] = [
+  { value: "parametric", label: "Parametric", description: "Risk parameters & limits · 5% quorum" },
+  { value: "fiscal", label: "Fiscal", description: "Treasury actions · 10% quorum" },
+  { value: "protocol_critical", label: "Protocol critical", description: "Halts & emergency · 15% quorum" },
+  { value: "constitutional", label: "Constitutional", description: "Irreversible rules · 15% quorum" },
 ];
+
+const STATUS_FILTERS = ["all", "active", "succeeded", "defeated", "expired", "executed"] as const;
 
 function statusBadge(status: string) {
   const variant =
@@ -25,12 +30,18 @@ function statusBadge(status: string) {
       ? "warning"
       : status === "succeeded" || status === "executed"
         ? "positive"
-        : "destructive";
+        : status === "expired"
+          ? "outline"
+          : "destructive";
   return <Badge variant={variant}>{status}</Badge>;
 }
 
 function classBadge(class_: ProposalClass) {
-  return <Badge variant={class_ === "protocol_critical" || class_ === "constitutional" ? "destructive" : "default"}>{class_}</Badge>;
+  return (
+    <Badge variant={class_ === "protocol_critical" || class_ === "constitutional" ? "destructive" : "default"}>
+      {class_}
+    </Badge>
+  );
 }
 
 function voteProgress(forVotes: number, againstVotes: number) {
@@ -39,11 +50,28 @@ function voteProgress(forVotes: number, againstVotes: number) {
   return (forVotes / total) * 100;
 }
 
+function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 p-5">
+        <div className="rounded-md bg-accent p-2 text-accent-foreground">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="text-xl font-semibold">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CreateProposalForm({ proposer }: { proposer: string }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [class_, setClass] = useState<ProposalClass>("parametric");
   const [targetProgram, setTargetProgram] = useState("");
+  const [days, setDays] = useState("7");
 
   const mutation = useMutation({
     mutationFn: (input: ProposalInput) => api.createProposal(input),
@@ -58,6 +86,9 @@ function CreateProposalForm({ proposer }: { proposer: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Create proposal</CardTitle>
+        <CardDescription>
+          Voting runs for the selected duration; quorum follows the proposal class.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -68,6 +99,7 @@ function CreateProposalForm({ proposer }: { proposer: string }) {
               title,
               class: class_,
               targetProgram: targetProgram || undefined,
+              endVotingAt: Math.floor(Date.now() / 1000) + Number(days) * 86_400,
             });
           }}
           className="grid grid-cols-1 gap-3 sm:grid-cols-3"
@@ -86,6 +118,16 @@ function CreateProposalForm({ proposer }: { proposer: string }) {
               ))}
             </select>
           </label>
+          <label className="space-y-1">
+            <span className="text-xs text-muted-foreground">Duration (days)</span>
+            <select value={days} onChange={(e) => setDays(e.target.value)} className={inputClass}>
+              {["3", "7", "14", "30"].map((d) => (
+                <option key={d} value={d}>
+                  {d} days
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="space-y-1 sm:col-span-2">
             <span className="text-xs text-muted-foreground">Target program (optional)</span>
             <input value={targetProgram} onChange={(e) => setTargetProgram(e.target.value)} className={inputClass} placeholder="Program address the instruction executes against" />
@@ -96,6 +138,9 @@ function CreateProposalForm({ proposer }: { proposer: string }) {
             </Button>
             {mutation.isError && <Badge variant="destructive">{mutation.error.message}</Badge>}
           </div>
+          <p className="text-xs text-muted-foreground sm:col-span-3">
+            {CLASSES.find((c) => c.value === class_)?.description}
+          </p>
         </form>
       </CardContent>
     </Card>
@@ -106,12 +151,18 @@ export default function DaoPage() {
   const { data: proposals } = useQuery({ queryKey: ["proposals"], queryFn: api.proposals });
   const { data: locks } = useQuery({ queryKey: ["locks"], queryFn: api.locks });
   const { data: managers } = useQuery({ queryKey: ["managers"], queryFn: api.managers });
+  const { data: vaults } = useQuery({ queryKey: ["vaults"], queryFn: api.vaults });
+  const { connected, publicKey } = useWallet();
   const queryClient = useQueryClient();
   const [proposer, setProposer] = useState("");
+  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("all");
+
+  const wallet = connected && publicKey ? publicKey.toBase58() : "";
+  const voter = wallet || proposer;
 
   const vote = useMutation({
     mutationFn: ({ id, inFavor }: { id: string; inFavor: boolean }) =>
-      api.castVote(id, { voter: proposer, inFavor }),
+      api.castVote(id, { voter, inFavor }),
     onSuccess: (updated) => {
       queryClient.setQueryData(["proposals"], (old: { id: string }[] | undefined) =>
         (old ?? []).map((p) => (p.id === updated.id ? updated : p)),
@@ -120,68 +171,175 @@ export default function DaoPage() {
   });
 
   const totalWeight = (locks ?? []).reduce((sum, l) => sum + l.weight, 0);
+  const totalTvl = vaults?.reduce((a, v) => a + v.tvl, 0) ?? 0;
+  const activeCount = (proposals ?? []).filter((p) => p.status === "active").length;
+  const myLock = (locks ?? []).find((l) => l.holder === voter);
+  const filtered = (proposals ?? []).filter(
+    (p) => statusFilter === "all" || p.status === statusFilter,
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Governance DAO</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Ve-locked ATLAS votes on risk parameters, treasury actions and protocol changes.
           Vote weight = locked amount × lock-duration multiplier.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat icon={Vote} label="Ve-ATLAS" value={formatUsd(totalWeight)} />
+        <Stat icon={Users} label="Active proposals" value={String(activeCount)} />
+        <Stat icon={ShieldCheck} label="Proposal classes" value={String(CLASSES.length)} />
+        <Stat icon={Landmark} label="Treasury reserve" value={formatUsd(totalTvl * 0.1)} />
+      </section>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Proposals</CardTitle>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-base">Proposals</CardTitle>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {STATUS_FILTERS.map((s) => (
+                <Button
+                  key={s}
+                  size="sm"
+                  variant={statusFilter === s ? "default" : "outline"}
+                  onClick={() => setStatusFilter(s)}
+                  className="capitalize"
+                >
+                  {s}
+                </Button>
+              ))}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {(proposals ?? []).map((p) => (
-              <div key={p.id} className="rounded-md border border-border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{p.title}</h3>
-                    {classBadge(p.class)}
-                    {statusBadge(p.status)}
+            {filtered.map((p) => {
+              const totalCast = p.forVotes + p.againstVotes;
+              const quorumPct = p.quorumWeight > 0 ? (totalCast / p.quorumWeight) * 100 : 0;
+              const timeLeft = p.endVotingAt - Math.floor(Date.now() / 1000);
+              const daysLeft = Math.ceil(timeLeft / 86_400);
+              return (
+                <div key={p.id} className="rounded-md border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-medium">{p.title}</h3>
+                      {classBadge(p.class)}
+                      {statusBadge(p.status)}
+                    </div>
+                    {p.status === "active" && (
+                      <span className="text-xs text-muted-foreground">
+                        {daysLeft > 0 ? `${daysLeft}d left` : "finalizing"}
+                      </span>
+                    )}
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    ends {new Date(p.endVotingAt * 1000).toLocaleDateString()}
-                  </span>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    by {p.proposer.slice(0, 6)}…{p.proposer.slice(-4)} · ends{" "}
+                    {new Date(p.endVotingAt * 1000).toLocaleDateString()}
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        For {formatUsd(p.forVotes)} · Against {formatUsd(p.againstVotes)}
+                      </span>
+                      <span>quorum {formatUsd(p.quorumWeight)} · {quorumPct.toFixed(0)}%</span>
+                    </div>
+                    <Progress value={voteProgress(p.forVotes, p.againstVotes)} />
+                    <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full bg-muted-foreground/50"
+                        style={{ width: `${Math.min(100, quorumPct)}%` }}
+                        title={`Quorum ${quorumPct.toFixed(0)}%`}
+                      />
+                    </div>
+                  </div>
+                  {p.status === "active" && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => vote.mutate({ id: p.id, inFavor: true })}
+                        disabled={vote.isPending || voter === ""}
+                      >
+                        For
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => vote.mutate({ id: p.id, inFavor: false })}
+                        disabled={vote.isPending || voter === ""}
+                      >
+                        Against
+                      </Button>
+                      {!voter && (
+                        <span className="text-xs text-muted-foreground">
+                          Connect a wallet or choose a voting wallet below to vote.
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>
-                      For {formatUsd(p.forVotes)} · Against {formatUsd(p.againstVotes)}
-                    </span>
-                    <span>quorum {formatUsd(p.quorumWeight)}</span>
-                  </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-border">
-                    <div
-                      className="h-full bg-positive"
-                      style={{ width: `${voteProgress(p.forVotes, p.againstVotes)}%` }}
-                    />
-                  </div>
-                </div>
-                {p.status === "active" && (
-                  <div className="mt-3 flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => vote.mutate({ id: p.id, inFavor: true })} disabled={vote.isPending}>
-                      For
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => vote.mutate({ id: p.id, inFavor: false })} disabled={vote.isPending}>
-                      Against
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No proposals in this view.
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <div className="space-y-4">
           <Card>
             <CardHeader>
+              <CardTitle className="text-base">My voting power</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {voter ? (
+                <>
+                  <p className="truncate text-xs text-muted-foreground">
+                    Wallet {voter.slice(0, 6)}…{voter.slice(-4)}
+                  </p>
+                  {myLock ? (
+                    <div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Ve-ATLAS weight</span>
+                        <span className="font-semibold">{formatUsd(myLock.weight)}</span>
+                      </div>
+                      <div className="mt-1 flex justify-between text-sm">
+                        <span className="text-muted-foreground">Share of supply</span>
+                        <span className="font-semibold">
+                          {totalWeight > 0 ? ((myLock.weight / totalWeight) * 100).toFixed(2) : "0.00"}%
+                        </span>
+                      </div>
+                      <div className="mt-1 flex justify-between text-sm">
+                        <span className="text-muted-foreground">Unlocks</span>
+                        <span className="font-medium">
+                          {new Date(myLock.unlockAt * 1000).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      This wallet has no ve-ATLAS lock, so it has no voting weight.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Connect your wallet to see your voting power, or select a manager wallet below to
+                  cast votes with its locked weight.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="text-base">Ve-locks</CardTitle>
+              <CardDescription>Locked ATLAS powering governance</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {(locks ?? []).map((l) => (
@@ -189,21 +347,41 @@ export default function DaoPage() {
                   <p className="truncate text-xs text-muted-foreground">{l.holder.slice(0, 18)}…</p>
                   <div className="mt-1 flex justify-between text-sm">
                     <span className="font-medium">{formatUsd(l.amount)}</span>
-                    <span className="text-muted-foreground">{Math.round((l.weight / Math.max(1, totalWeight)) * 100)}%</span>
+                    <span className="text-muted-foreground">
+                      {totalWeight > 0 ? Math.round((l.weight / totalWeight) * 100) : 0}%
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     unlocks {new Date(l.unlockAt * 1000).toLocaleDateString()}
                   </p>
                 </div>
               ))}
+              {(locks ?? []).length === 0 && (
+                <p className="text-sm text-muted-foreground">No locks yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">How ve-locking works</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>Lock ATLAS for up to 4 years to receive ve-ATLAS.</p>
+              <p>Vote weight scales linearly with lock duration, up to 4× the locked amount.</p>
+              <p>Votes count toward quorum and passage thresholds per proposal class.</p>
+              <p>Unlocked positions stop earning weight immediately.</p>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {connected && publicKey && (
+          <Badge variant="positive">Voting as {publicKey.toBase58().slice(0, 8)}…</Badge>
+        )}
         <label className="flex-1 space-y-1">
-          <span className="text-xs text-muted-foreground">Voting wallet</span>
+          <span className="text-xs text-muted-foreground">Voting wallet {connected && "(or use your connected wallet)"}</span>
           <select value={proposer} onChange={(e) => setProposer(e.target.value)} className={inputClass}>
             <option value="">Choose a wallet…</option>
             {(managers ?? []).map((m) => (
@@ -215,7 +393,7 @@ export default function DaoPage() {
         </label>
       </div>
 
-      <CreateProposalForm proposer={proposer || "anonymous"} />
+      <CreateProposalForm proposer={proposer || wallet || "anonymous"} />
     </div>
   );
 }

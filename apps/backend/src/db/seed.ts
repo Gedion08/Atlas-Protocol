@@ -325,6 +325,23 @@ export const seedVaults: Vault[] = [
     createdAt: Date.now() - 260 * 86_400_000,
     lastRebalanceAt: Date.now() - 30 * 60 * 1000,
   },
+  {
+    address: "VaU4tXYb7mX8G5w3eRkQzKj4nLpDcVfBqHtSwXcYaZx",
+    name: "Atlas Momentum",
+    baseAsset: "SOL",
+    managerId: "mgr_volta",
+    authority: "AtL45sAu2DvBqPj9nRyGcE7fHwMzNxQkTpSrLvJmWcYa",
+    status: "active",
+    tvl: 3_400_000,
+    apy: 31.2,
+    sharesOutstanding: 2_900_000,
+    managementFeeBps: 90,
+    performanceFeeBps: 2500,
+    minDeposit: 250,
+    allocation: null,
+    createdAt: Date.now() - 200 * 86_400_000,
+    lastRebalanceAt: Date.now() - 7_200_000,
+  },
 ];
 
 export const seedLocks: VeLockView[] = [

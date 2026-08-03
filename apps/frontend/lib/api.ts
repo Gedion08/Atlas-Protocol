@@ -1,15 +1,20 @@
 import type {
+  DepositInput,
   GovernanceProposal,
   GovernanceVote,
+  InvestorPosition,
+  InvestorSummary,
   LeaderboardEntry,
   ManagerPerformance,
   ManagerProfile,
   ProposalInput,
+  RiskDecision,
   Strategy,
   StrategyUpload,
   Vault,
   VeLockView,
   VoteInput,
+  WithdrawInput,
 } from "atlas-types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -347,10 +352,16 @@ export const api = {
     null,
   managerPerformance: async (id: string): Promise<ManagerPerformance | null> =>
     (await get<ManagerPerformance>(`/api/v1/managers/${id}/performance`)) ?? fallbackPerf(id),
+  managerRisk: async (id: string): Promise<RiskDecision | null> =>
+    (await get<RiskDecision>(`/api/v1/managers/${id}/risk`)) ?? null,
   leaderboard: async (): Promise<LeaderboardEntry[]> =>
     (await get<LeaderboardEntry[]>("/api/v1/leaderboard")) ??
     fallbackManagers.map((m, i) => ({ ...m, rank: i + 1, apy: 14 + i * 2.2, sharpe: 1.5, maxDrawdown: m.maxDrawdown })),
   strategies: async (): Promise<Strategy[]> => (await get<Strategy[]>("/api/v1/strategies")) ?? fallbackStrategies,
+  strategy: async (id: string): Promise<Strategy | null> =>
+    (await get<Strategy>(`/api/v1/strategies/${id}`)) ??
+    fallbackStrategies.find((s) => s.id === id) ??
+    null,
   uploadStrategy: async (
     upload: StrategyUpload,
     auth?: { owner: string; nonce: string; signature: string },
@@ -375,7 +386,62 @@ export const api = {
         createdAt: Date.now() - 400 * 86_400_000,
         lastRebalanceAt: Date.now() - 3_600_000,
       },
+      {
+        address: "VaU2tXYb7mX8G5w3eRkQzKj4nLpDcVfBqHtSwXcYaZx",
+        name: "Atlas Stable Reserve",
+        baseAsset: "USDT",
+        managerId: "mgr_harbor",
+        authority: "AtL45sAu2DvBqPj9nRyGcE7fHwMzNxQkTpSrLvJmWcYa",
+        status: "active",
+        tvl: 14_500_000,
+        apy: 8.9,
+        sharesOutstanding: 13_000_000,
+        managementFeeBps: 40,
+        performanceFeeBps: 1000,
+        minDeposit: 100,
+        allocation: null,
+        createdAt: Date.now() - 700 * 86_400_000,
+        lastRebalanceAt: Date.now() - 86_400_000,
+      },
+      {
+        address: "VaU3tXYb7mX8G5w3eRkQzKj4nLpDcVfBqHtSwXcYaZx",
+        name: "Atlas Vol Alpha",
+        baseAsset: "SOL",
+        managerId: "mgr_apex",
+        authority: "AtL45sAu2DvBqPj9nRyGcE7fHwMzNxQkTpSrLvJmWcYa",
+        status: "active",
+        tvl: 6_800_000,
+        apy: 26.1,
+        sharesOutstanding: 5_200_000,
+        managementFeeBps: 75,
+        performanceFeeBps: 2000,
+        minDeposit: 500,
+        allocation: null,
+        createdAt: Date.now() - 260 * 86_400_000,
+        lastRebalanceAt: Date.now() - 30 * 60 * 1000,
+      },
+      {
+        address: "VaU4tXYb7mX8G5w3eRkQzKj4nLpDcVfBqHtSwXcYaZx",
+        name: "Atlas Momentum",
+        baseAsset: "SOL",
+        managerId: "mgr_volta",
+        authority: "AtL45sAu2DvBqPj9nRyGcE7fHwMzNxQkTpSrLvJmWcYa",
+        status: "active",
+        tvl: 3_400_000,
+        apy: 31.2,
+        sharesOutstanding: 2_900_000,
+        managementFeeBps: 90,
+        performanceFeeBps: 2500,
+        minDeposit: 250,
+        allocation: null,
+        createdAt: Date.now() - 200 * 86_400_000,
+        lastRebalanceAt: Date.now() - 7_200_000,
+      },
     ],
+  vault: async (address: string): Promise<Vault | null> =>
+    (await get<Vault>(`/api/v1/vaults/${address}`)) ??
+    (await api.vaults()).find((v) => v.address === address) ??
+    null,
   vaultPricing: async (address: string): Promise<{ sharePrice: number; tvl: number; sharesOutstanding: number; pricedAt: number }> => {
     const vault = (await get<Vault>(`/api/v1/vaults/${address}`)) ?? (await api.vaults())[0];
     if (!vault) return { sharePrice: 0, tvl: 0, sharesOutstanding: 0, pricedAt: Date.now() };
@@ -405,4 +471,28 @@ export const api = {
     (await get<VeLockView[]>("/api/v1/governance/locks")) ?? fallbackLocks,
   votes: async (id: string): Promise<GovernanceVote[]> =>
     (await get<GovernanceVote[]>(`/api/v1/governance/proposals/${id}/votes`)) ?? [],
+  investorPositions: async (wallet: string): Promise<InvestorPosition[]> =>
+    (await get<InvestorPosition[]>(`/api/v1/investors/${wallet}/positions`)) ?? [],
+  investorSummary: async (wallet: string): Promise<InvestorSummary | null> =>
+    (await get<InvestorSummary>(`/api/v1/investors/${wallet}`)) ?? null,
+  deposit: async (
+    vaultAddress: string,
+    input: DepositInput,
+    auth?: { owner: string; nonce: string; signature: string },
+  ): Promise<{ position: InvestorPosition; vault: Vault }> =>
+    post<{ position: InvestorPosition; vault: Vault }>(
+      `/api/v1/vaults/${vaultAddress}/deposit`,
+      input,
+      auth ? buildSignatureHeaders(auth) : undefined,
+    ),
+  withdraw: async (
+    vaultAddress: string,
+    input: WithdrawInput,
+    auth?: { owner: string; nonce: string; signature: string },
+  ): Promise<{ position: InvestorPosition; proceeds: number; sharesRedeemed: number; vault: Vault }> =>
+    post<{ position: InvestorPosition; proceeds: number; sharesRedeemed: number; vault: Vault }>(
+      `/api/v1/vaults/${vaultAddress}/withdraw`,
+      input,
+      auth ? buildSignatureHeaders(auth) : undefined,
+    ),
 };

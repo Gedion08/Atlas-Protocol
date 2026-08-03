@@ -1,6 +1,8 @@
 import type {
+  DepositInput,
   GovernanceProposal,
   GovernanceVote,
+  InvestorPosition,
   LeaderboardEntry,
   ManagerPerformance,
   ManagerProfile,
@@ -19,6 +21,7 @@ import type { OracleSubmission } from "../services/oracle/index.js";
 import { classParams, lockWeight, VOTING_DURATION_SECS } from "../services/governance/index.js";
 import type {
   GovernanceRepository,
+  InvestorRepository,
   ManagerRepository,
   OracleRepository,
   Repositories,
@@ -333,6 +336,91 @@ export class PgVaultRepository implements VaultRepository {
     const result = await this.pool.query("SELECT * FROM vaults WHERE address = $1", [address]);
     return result.rows[0] ? toVault(result.rows[0]) : null;
   }
+
+  async update(vault: Vault): Promise<Vault> {
+    const result = await this.pool.query(
+      `UPDATE vaults
+       SET tvl = $2, shares_outstanding = $3, last_rebalance_at = $4
+       WHERE address = $1
+       RETURNING *`,
+      [vault.address, vault.tvl, vault.sharesOutstanding, vault.lastRebalanceAt],
+    );
+    return toVault(result.rows[0]);
+  }
+}
+
+function toPosition(row: Record<string, unknown>): InvestorPosition {
+  return {
+    id: row.id as string,
+    investor: row.investor as string,
+    vaultAddress: row.vault_address as string,
+    strategyId: (row.strategy_id as string) ?? undefined,
+    amount: Number(row.amount),
+    shares: Number(row.shares),
+    sharePrice: Number(row.share_price),
+    status: row.status as InvestorPosition["status"],
+    createdAt: Number(row.created_at),
+  };
+}
+
+function round6(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+export class PgInvestorRepository implements InvestorRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async listPositions(investor: string): Promise<InvestorPosition[]> {
+    const result = await this.pool.query(
+      "SELECT * FROM investor_positions WHERE investor = $1 ORDER BY created_at DESC",
+      [investor],
+    );
+    return result.rows.map(toPosition);
+  }
+
+  async getPosition(id: string): Promise<InvestorPosition | null> {
+    const result = await this.pool.query("SELECT * FROM investor_positions WHERE id = $1", [id]);
+    return result.rows[0] ? toPosition(result.rows[0]) : null;
+  }
+
+  async deposit(vault: Vault, input: DepositInput): Promise<InvestorPosition> {
+    const sharePrice =
+      vault.sharesOutstanding > 0 ? vault.tvl / vault.sharesOutstanding : 1;
+    const shares = round6(input.amount / sharePrice);
+    const id = `pos_${input.investor.slice(0, 8)}_${Math.random().toString(36).slice(2, 8)}`;
+    const result = await this.pool.query(
+      `INSERT INTO investor_positions (
+         id, investor, vault_address, strategy_id, amount, shares, share_price, status, created_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,'active',$8)
+       RETURNING *`,
+      [id, input.investor, vault.address, input.strategyId ?? null, input.amount, shares, sharePrice, Date.now()],
+    );
+    return toPosition(result.rows[0]);
+  }
+
+  async withdraw(
+    positionId: string,
+    vault: Vault,
+    shares: number,
+  ): Promise<{ position: InvestorPosition; proceeds: number; sharesRedeemed: number } | null> {
+    const current = await this.getPosition(positionId);
+    if (!current || current.status !== "active" || current.vaultAddress !== vault.address) {
+      return null;
+    }
+    const sharePrice =
+      vault.sharesOutstanding > 0 ? vault.tvl / vault.sharesOutstanding : current.sharePrice;
+    const sharesRedeemed = Math.min(round6(shares), current.shares);
+    const proceeds = round6(sharesRedeemed * sharePrice);
+    const remaining = round6(current.shares - sharesRedeemed);
+    const result = await this.pool.query(
+      `UPDATE investor_positions
+       SET shares = $2, status = $3
+       WHERE id = $1
+       RETURNING *`,
+      [positionId, remaining, remaining <= 0 ? "withdrawn" : "active"],
+    );
+    return { position: toPosition(result.rows[0]), proceeds, sharesRedeemed };
+  }
 }
 
 function toProposal(row: Record<string, unknown>): GovernanceProposal {
@@ -477,6 +565,7 @@ export async function createPostgresRepositories(): Promise<Repositories> {
     managers: new PgManagerRepository(pool),
     strategies: new PgStrategyRepository(pool),
     vaults: new PgVaultRepository(pool),
+    investors: new PgInvestorRepository(pool),
     oracle: new PgOracleRepository(pool),
     governance: new PgGovernanceRepository(pool),
   };

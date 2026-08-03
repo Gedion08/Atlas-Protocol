@@ -11,7 +11,8 @@
     "typecheck": "pnpm -r typecheck",
     "anchor:build": "anchor build",
     "anchor:test": "anchor test",
-    "db:migrate": "pnpm --filter atlas-backend db:migrate"
+    "db:migrate": "pnpm --filter atlas-backend db:migrate",
+    "db:seed": "pnpm --filter atlas-backend db:seed"
   },
   "engines": {
     "node": ">=20"

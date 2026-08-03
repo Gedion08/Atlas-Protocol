@@ -319,3 +319,42 @@ export interface VoteInput {
   voter: Address;
   inFavor: boolean;
 }
+
+export type PositionStatus = "pending" | "active" | "withdrawn";
+
+/** An investor's capital in a vault (shares against a vault). */
+export interface InvestorPosition {
+  id: string;
+  investor: Address;
+  vaultAddress: Address;
+  /** Strategy the position was directed toward (optional). */
+  strategyId?: Address;
+  /** Base-asset amount deposited at entry. */
+  amount: number;
+  /** Vault shares received at entry (price-accounted). */
+  shares: number;
+  /** NAV/share at entry (oracle-priced). */
+  sharePrice: number;
+  status: PositionStatus;
+  createdAt: number;
+}
+
+export interface DepositInput {
+  investor: Address;
+  amount: number;
+  strategyId?: Address;
+}
+
+export interface WithdrawInput {
+  investor: Address;
+  shares: number;
+}
+
+export interface InvestorSummary {
+  investor: Address;
+  totalInvested: number;
+  currentValue: number;
+  positionCount: number;
+  positions: InvestorPosition[];
+  vaults: Address[];
+}

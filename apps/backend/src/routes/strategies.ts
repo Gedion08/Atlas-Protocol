@@ -2,12 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "../db/repositories.js";
 import { riskTierFromScore } from "../services/scoring/index.js";
-import {
-  NonceStore,
-  buildAuthMessage,
-  sha256Hex,
-  verifyWalletSignature,
-} from "../services/auth/signature.js";
+import { NonceStore, requireWalletSignature } from "../services/auth/signature.js";
 
 const strategyQuery = z.object({
   managerId: z.string().optional(),
@@ -49,38 +44,6 @@ const strategyUploadBody = z.object({
  * re-derives it from the parsed body. `owner` must match the target manager's
  * on-chain owner public key; nonces are single-use and expire after 5 minutes.
  */
-export function requireWalletSignature(deps: {
-  nonces: NonceStore;
-  ownerHeader: string | undefined;
-  nonceHeader: string | undefined;
-  signatureHeader: string | undefined;
-  body: unknown;
-  expectedOwner: string;
-}): { ok: true } | { ok: false; error: string; message: string; statusCode: number } {
-  const { ownerHeader, nonceHeader, signatureHeader, body } = deps;
-  if (!ownerHeader || !nonceHeader || !signatureHeader) {
-    return {
-      ok: false,
-      error: "missing_signature_headers",
-      message: "x-atlas-owner, x-atlas-nonce and x-atlas-signature headers are required",
-      statusCode: 401,
-    };
-  }
-  if (ownerHeader !== deps.expectedOwner) {
-    return { ok: false, error: "signer_mismatch", message: "Signer is not the manager owner", statusCode: 403 };
-  }
-  if (!deps.nonces.isFresh(nonceHeader)) {
-    return { ok: false, error: "stale_or_reused_nonce", message: "Nonce expired or already used", statusCode: 400 };
-  }
-  const payloadSha256 = sha256Hex(JSON.stringify(body));
-  const message = buildAuthMessage({ owner: ownerHeader, nonce: nonceHeader, payloadSha256 });
-  if (!verifyWalletSignature({ owner: ownerHeader, signature: signatureHeader, message })) {
-    return { ok: false, error: "invalid_signature", message: "Signature verification failed", statusCode: 401 };
-  }
-  deps.nonces.consume(nonceHeader);
-  return { ok: true };
-}
-
 export async function registerStrategyRoutes(
   app: FastifyInstance,
   repos: Repositories,

@@ -1,114 +1,104 @@
 # Atlas Protocol
 
-> The decentralized operating system for professional liquidity providers.
+Atlas Protocol is a pnpm monorepo for a Solana-native liquidity allocation system.
+The workspace combines Rust Anchor programs, a Fastify backend, and a Next.js frontend.
 
-Atlas Protocol builds the first decentralized marketplace where capital providers allocate
-liquidity to verified LP managers based entirely on transparent on-chain performance.
+## What lives in this repo
 
-**The protocol never predicts markets. It never creates yield. It simply allocates capital
-intelligently to the best liquidity providers.**
+- `programs/` — Anchor programs for vault, manager registry, staking, treasury, and governance.
+- `apps/backend/` — Fastify API, Solana submitter, risk engine, scoring, allocation, indexer, and oracle services.
+- `apps/frontend/` — Next.js 15 dashboard and wallet UX.
+- `packages/types/` — shared TypeScript domain models.
+- `deploy/` — deployment, keypair, and init automation for Solana devnet configuration.
+- `docs/` — architecture and protocol design references.
 
-> "BlackRock meets Beefy on Solana."
+## Current stack
 
-## Monorepo layout
+- Rust + Anchor
+- TypeScript + pnpm workspaces
+- Fastify backend
+- Next.js frontend
+- Solana devnet deployment scripts
 
-```
-atlas-protocol/
-├── programs/                  # Solana Anchor programs (Rust)
-│   ├── vault/                 # Investor vaults: deposit, withdraw, shares
-│   ├── manager-registry/      # LP manager profiles and on-chain score
-│   └── staking/               # Manager bonding, unbonding, slashing, insurance escrow
-├── apps/
-│   ├── backend/               # Fastify API + services (risk, scoring, allocation, indexer)
-│   └── frontend/              # Next.js dashboards (investor, manager, protocol)
-├── packages/
-│   └── types/                 # Shared TypeScript domain types
-├── docs/
-│   ├── architecture.md        # System architecture and data flow
-│   ├── risk-engine.md         # Risk metrics, limits, and auto-pause rules
-│   ├── manager-score.md       # Weighted reputation formula
-│   └── roadmap.md             # Milestone plan
-└── .env.example
-```
-
-## Quickstart
+## Local development
 
 ### Prerequisites
 
-- Node.js >= 20 and pnpm
+- Node.js 20+
+- pnpm 11+
 - Rust + Cargo
-- Anchor CLI (`cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli`)
+- Anchor CLI 0.30.1
 
-### Install
+### Install workspace dependencies
 
 ```bash
 pnpm install
-cp .env.example .env
 ```
 
-### Backend
+### Common commands
 
 ```bash
-pnpm dev:backend          # Fastify API on :4000
+pnpm build
+pnpm test
+pnpm typecheck
 pnpm --filter atlas-backend test
-pnpm db:migrate           # applies db/migrations/0001_init.sql to PostgreSQL
+pnpm --filter atlas-frontend test
+pnpm --filter atlas-frontend lint
+pnpm --filter atlas-types build
+pnpm --filter atlas-sdk build
 ```
 
-### Frontend
+### Run the apps
 
 ```bash
-pnpm dev:frontend         # Next.js on :3000
+pnpm dev:backend
+pnpm dev:frontend
 ```
 
-### Solana programs
+### Build and test the Rust programs
 
 ```bash
 anchor build
 anchor test
 ```
 
-Program IDs (dev scaffolds):
+## Deploying on Solana devnet
 
-| Program          | Address                                      |
-| ---------------- | -------------------------------------------- |
-| atlas-vault      | `AfCPkgDj8ADzebwdWW9T8WTAyXVqMccaPkQJsQHFMhtr` |
-| manager-registry | `9h29CPwoYFgQ4wYN2oWWCyA9rS3nMYaeS99Y676zSGa8` |
-| staking          | `B2sKSyicsc65bJ8AXZigQSfa1MUBiKbBjRqpYQuT6iUA` |
+The deployment workflow lives in `deploy/`.
+The repo expects the Anchor programs to be deployed first, then the on-chain configuration to be initialized with the generated program IDs.
 
-## Docker deployment
+### Current devnet program IDs
 
-```bash
-make docker-up          # builds and starts postgres + migrate + backend + frontend
-make docker-logs        # tail logs from all services
-make docker-down        # stop all services (data persists in the pgdata volume)
-```
+These are the addresses recorded in the repo’s deployment artifact:
 
-`docker compose up` runs database migrations as a one-time `migrate` service
-before the backend starts, so a fresh clone is fully bootstrapped. Override
-defaults via environment variables (see `.env.example`):
+- Vault: `BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR`
+- Manager Registry: `CgLpJydFMSrkAHLjhmEZX3pFF4M5BC8CY36ajBe2bvTs`
+- Staking: `4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H`
+- Governance: `5fcfpz4DK8G4HbPMyX259fgotXJaE4v7yNhXidRAtWnD`
+- Treasury: `86pSPBBGKzMXteNGjxPT8XSt3fjuZGRMVMnEhQpWiefS`
 
-```bash
-POSTGRES_USER=atlas POSTGRES_PASSWORD=change-me make docker-up
-```
+For Render-backed backend runtime configuration, the backend uses `ATLAS_REGISTRY_PROGRAM_ID` as the main Solana program reference.
+See `apps/backend/src/env.ts` for the environment contract.
 
-Service endpoints: frontend `http://localhost:3000`, API `http://localhost:8080`,
-Swagger docs `http://localhost:8080/docs`, Postgres `localhost:5432`.
+## Backend environment notes
 
-## Current scaffold status
+The backend reads its runtime settings from `apps/backend/src/env.ts`.
+The key values you typically need in deployment are:
 
-| Area                        | Status                                        |
-| --------------------------- | --------------------------------------------- |
-| Anchor programs (5)         | Scaffolded, compile against anchor 0.30.1     |
-| Scoring service             | Implemented + tested (weighted formula)       |
-| Risk engine                 | Implemented + tested (VaR, ES, rules, pause)  |
-| Allocation engine           | Implemented + tested (capped reweighting)     |
-| Backend API                 | REST routes + WebSocket feed (in-memory repo) |
-| Indexer                     | Helius webhook normalization + event bus stub |
-| DB migrations               | PostgreSQL + ClickHouse DDL                   |
-| Frontend dashboards         | Investor, strategies, leaderboard, protocol   |
-| SDK / strategy upload       | Not started                                   |
-| Governance / DAO            | Not started                                   |
-| Performance oracle (full)   | Not started (ClickHouse ingest pipeline)      |
-| Automation engine (on-chain)| Not started                                   |
+- `ATLAS_REGISTRY_PROGRAM_ID`
+- `SOLANA_RPC_URL`
+- `ORACLE_KEYPAIR` when enabling oracle submission
+- `GOVERNANCE_KEYPAIR` when enabling circuit-breaker submission
 
-See `docs/roadmap.md` for the milestone plan.
+## Documentation map
+
+- `docs/architecture.md` — system architecture and account/data flow
+- `docs/risk-engine.md` — risk engine model, thresholds, and safeguards
+- `docs/manager-score.md` — manager score calculation
+- `docs/protocol-economics.md` — protocol economics and token flow
+- `docs/roadmap.md` — delivery roadmap
+
+## Repository hygiene
+
+A few local-only installer and environment helper files are not part of the source-of-truth project workflow and should stay out of version-control commits.
+The checked-in repo is organized to keep the runtime workspace, generated build artifacts, and local toolchain files out of the Git history.

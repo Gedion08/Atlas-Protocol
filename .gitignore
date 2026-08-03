@@ -9,6 +9,7 @@ coverage/
 .env
 .env.local
 .env.*.local
+.venv/
 *.pem
 *.key
 .DS_Store

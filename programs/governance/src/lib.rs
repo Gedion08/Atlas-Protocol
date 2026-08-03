@@ -7,7 +7,7 @@ pub mod state;
 use instructions::*;
 pub use state::*;
 
-declare_id!("5vTfeciGVp3J6FWkvEGPfrdDNFAUkBA8RFXDvaKzZPBe");
+declare_id!("5fcfpz4DK8G4HbPMyX259fgotXJaE4v7yNhXidRAtWnD");
 
 #[program]
 pub mod atlas_governance {

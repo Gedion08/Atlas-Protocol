@@ -7,7 +7,7 @@ pub mod state;
 use instructions::*;
 pub use state::*;
 
-declare_id!("AbFBCeqqBxpoAGamrPNmrXXMHY5qHybjsoTyYaKJL86q");
+declare_id!("86pSPBBGKzMXteNGjxPT8XSt3fjuZGRMVMnEhQpWiefS");
 
 #[program]
 pub mod atlas_treasury {

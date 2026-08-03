@@ -1,0 +1,20 @@
+[workspace]
+members = ["vault", "manager-registry", "staking", "governance", "treasury"]
+
+[provider]
+cluster = "devnet"
+wallet = "../deploy/deployer.json"
+
+[programs.devnet]
+atlas_staking = "4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H"
+atlas_manager_registry = "CgLpJydFMSrkAHLjhmEZX3pFF4M5BC8CY36ajBe2bvTs"
+atlas_vault = "BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR"
+atlas_treasury = "86pSPBBGKzMXteNGjxPT8XSt3fjuZGRMVMnEhQpWiefS"
+atlas_governance = "5fcfpz4DK8G4HbPMyX259fgotXJaE4v7yNhXidRAtWnD"
+
+[registry]
+url = "https://anchor.fm/v1"
+
+[build]
+# Use standard optimization (avoid LTO to prevent compiler ICE)
+rustflags = ["-C", "lto=Thin", "-C", "codegen-units=8"]

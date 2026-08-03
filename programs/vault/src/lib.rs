@@ -7,7 +7,7 @@ pub mod state;
 use instructions::*;
 pub use state::*;
 
-declare_id!("AfCPkgDj8ADzebwdWW9T8WTAyXVqMccaPkQJsQHFMhtr");
+declare_id!("BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR");
 
 #[program]
 pub mod atlas_vault {

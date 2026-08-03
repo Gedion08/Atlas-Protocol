@@ -1,0 +1,43 @@
+{
+  "rpcUrl": "https://devnet.helius-rpc.com/?api-key=8b2dc0c5-66c0-492b-8dc5-53e99da14369",
+  "deployer": "AqsVGUdZKd7cKr3KJSW7mTM1BwTyyS4pKqDAT5qDQBnu",
+  "programs": {
+    "vault": "BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR",
+    "registry": "CgLpJydFMSrkAHLjhmEZX3pFF4M5BC8CY36ajBe2bvTs",
+    "staking": "4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H",
+    "governance": "5fcfpz4DK8G4HbPMyX259fgotXJaE4v7yNhXidRAtWnD",
+    "treasury": "86pSPBBGKzMXteNGjxPT8XSt3fjuZGRMVMnEhQpWiefS"
+  },
+  "pdas": {
+    "registryConfig": "Bg7YUnjnwguXsib5BngaPTtWu7YQiDgFx9wxgUmpQsmZ",
+    "vaultConfig": "4ezPX7RmRqLpHEazgwvghBqWBswfDCHdRpXRFSu3FKDU",
+    "stakingConfig": "B6kRupic51bXe5X4i2T6gYpCki2f7rvaA7RS2Qy5qmW1",
+    "treasuryConfig": "3LPhf1B4upbcL371MB7NNTy9GrYBB81zfqezHrdBA1SA",
+    "governanceConfig": "Cyun7cLpLbQ6bFxfAG2vd8jyPt9qWSohD1gRpVEB94Ge"
+  },
+  "mints": {
+    "bond": "HxgWC6Xg1PRfKK4dCa9C8GZfRpE1dDJnC6nEeYFK6Agf",
+    "atlas": "7roukPrgB6rjLrJ9mqHoiCrMTjwYzT8UKbxGgtTRVtEa",
+    "revenue": "FvaBg3qEinDxchxwxMYQLRmPiXJPetzqEvLsyJgK8PGA"
+  },
+  "oracles": [
+    {
+      "keypair": "./deploy/oracle1.json",
+      "pubkey": "D3h4WZmBHx6ZqsKAnF9grMcbG89icqNV2BzEvHAt4fw8"
+    },
+    {
+      "keypair": "./deploy/oracle2.json",
+      "pubkey": "AA7rAfUF2zUUkFgDfFyButvTcyHvpqwKjVYw1kVAwWmz"
+    },
+    {
+      "keypair": "./deploy/oracle3.json",
+      "pubkey": "FfK7bMGqaZ916i5rA6HSCDZuz7fbbwa5Tz23eGFfdvP1"
+    }
+  ],
+  "config": {
+    "bondAmount": "100000000",
+    "scoreThreshold": 40,
+    "minOracleSignatures": 3,
+    "reserveTarget": "0"
+  }
+}

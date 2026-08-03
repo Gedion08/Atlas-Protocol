@@ -7,7 +7,7 @@ pub mod state;
 use instructions::*;
 pub use state::*;
 
-declare_id!("B2sKSyicsc65bJ8AXZigQSfa1MUBiKbBjRqpYQuT6iUA");
+declare_id!("4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H");
 
 #[program]
 pub mod atlas_staking {

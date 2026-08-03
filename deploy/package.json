@@ -1,0 +1,17 @@
+{
+  "name": "atlas-deploy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deployment scripts for Atlas Protocol",
+  "type": "module",
+  "scripts": {
+    "deploy": "bash deploy/deploy.sh",
+    "init": "node ./initialize-configs.js"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "file:../../../../../tmp/anchor-0.30.1.tgz",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.98.0",
+    "yargs": "^17.7.2"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "rpcUrl": "https://devnet.helius-rpc.com/?api-key=8b2dc0c5-66c0-492b-8dc5-53e99da14369",
+  "rpcUrl": "https://api.devnet.solana.com",
   "deployer": "AqsVGUdZKd7cKr3KJSW7mTM1BwTyyS4pKqDAT5qDQBnu",
   "programs": {
     "vault": "BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR",

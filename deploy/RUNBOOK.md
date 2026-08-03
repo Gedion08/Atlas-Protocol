@@ -58,7 +58,9 @@ cargo build --workspace --manifest-path programs/Cargo.toml
 - The command should finish successfully with a line like:
   `Finished dev profile [unoptimized + debuginfo] target(s) in ...`
 - The resulting compiled artifacts live under `programs/target/debug/` for the local Cargo build.
-- You may see `unexpected cfg` warnings such as `anchor-debug`, `custom-heap`, `custom-panic`, and `solana` during the build. Those warnings are non-fatal for the current Cargo workspace build and do not indicate a broken compilation.
+- Each program manifest declares the Anchor `cfg(feature = ...)` values (`anchor-debug`,
+  `custom-heap`, `custom-panic`, `solana`, `target_os = "solana"`) via `[lints.rust]`,
+  so `cargo clippy --workspace -- -D warnings` and `cargo build` produce no warnings.
 
 **Note**: This repository is a Cargo workspace, not a committed Anchor workspace. If you run `anchor build` from `programs/`, you can get `Not in workspace` because there is no committed `Anchor.toml` in the repo. The supported build entrypoint here is `cargo build --workspace --manifest-path programs/Cargo.toml`.
 
@@ -66,11 +68,23 @@ cargo build --workspace --manifest-path programs/Cargo.toml
 
 ## Phase 2: Prepare Deployment Wallet
 
-### Option A: Use the provided wallet
+> **Security note:** The Solana keypairs (`deploy/deployer.json`, `deploy/oracle1-3.json`)
+> are **no longer tracked in git** — they are local-only secrets. Generate them fresh
+> with the commands below, keep them out of version control, and treat them like
+> passwords (store in a password manager or secret manager). If a keypair was ever
+> committed to GitHub, rotate it by generating a new one and re-funding it.
 
-The keypair file has been created at `deploy/deployer.json`. Before using it, you MUST:
+### Option A: Use the local wallet
 
-1. **Verify ownership**: This wallet is provided by the user — make sure you control it
+Since keypairs are no longer committed, `deploy/deployer.json` must be created locally
+before deploying. Generate it (or restore it from your secret manager), then fund it.
+
+1. **Generate the wallet** (skip if you already have `deploy/deployer.json` locally):
+
+```bash
+solana-keygen new --no-bip39-passphrase --outfile deploy/deployer.json
+```
+
 2. **Fund with devnet SOL**: The wallet needs SOL for transaction fees
 
 ```bash
@@ -322,6 +336,11 @@ HOST=0.0.0.0
 DATABASE_URL=postgresql://postgres:postgres@aws-us-west-2.render.com:5432/atlas
 REPOSITORY_DRIVER=postgres
 
+# Migrations + demo seed run automatically at backend startup (idempotent).
+# Set to false only if you manage schema elsewhere.
+DB_AUTO_MIGRATE=true
+DB_AUTO_SEED=true
+
 # Get from your deployed program IDs
 ATLAS_REGISTRY_PROGRAM_ID=7n1a5j...your-registry-program-id
 
@@ -344,18 +363,23 @@ METRICS_ENABLED=true
 
 ### 5.5. Database Setup
 
-After the database is provisioned:
+With `REPOSITORY_DRIVER=postgres`, the backend **applies migrations and seeds demo
+data automatically on first boot** (both are idempotent), so a fresh database needs
+no manual setup. For existing databases you can still run them explicitly:
 
 ```bash
 # Apply migrations
 DATABASE_URL="postgresql://postgres:postgres@HOST:5432/atlas" \
   pnpm --filter atlas-backend db:migrate
 
-# Or run from Render shell:
-render shell
-# Then inside the shell:
-DATABASE_URL="postgresql://..." pnpm --filter atlas-backend db:migrate
+# Seed demo data (ON CONFLICT DO NOTHING — safe to re-run)
+DATABASE_URL="postgresql://..." pnpm --filter atlas-backend db:seed
 ```
+
+> Supabase: use the "Connection string → URI" value from Database → Connection settings.
+> It includes `sslmode=require`, which the backend detects automatically. Prefer the
+> **pooler/transaction** URI for the Render service, or set `DATABASE_URL` with the
+> direct connection and keep pool sizing small (the backend uses `max: 10`).
 
 ---
 
@@ -400,7 +424,7 @@ Click "Deploy" — Vercel will auto-deploy on every git push.
 
 ```bash
 curl https://your-backend.onrender.com/health/ready
-# Expected: {"status":"ok","checks":[{"name":"database","status":"pass"}]}
+# Expected: {"status":"ready","driver":"postgres"}
 ```
 
 ### 7.2. API Endpoints

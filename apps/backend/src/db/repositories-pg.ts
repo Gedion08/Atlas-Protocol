@@ -15,9 +15,10 @@ import type {
   VeLockView,
   VoteInput,
 } from "atlas-types";
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import { env } from "../env.js";
 import type { OracleSubmission } from "../services/oracle/index.js";
+import { buildPgPool, runMigrations, seedIfEmpty } from "./bootstrap.js";
 import { classParams, lockWeight, VOTING_DURATION_SECS } from "../services/governance/index.js";
 import type {
   GovernanceRepository,
@@ -85,7 +86,12 @@ function toStrategy(row: Record<string, unknown>): Strategy {
     riskTier: Number(row.risk_tier) as Strategy["riskTier"],
     status: (row.status as Strategy["status"]) ?? "active",
     description: (row.description as string) ?? undefined,
-    params: row.params ? (JSON.parse(row.params as string) as Record<string, unknown>) : undefined,
+    params:
+      row.params != null
+        ? typeof row.params === "string"
+          ? (JSON.parse(row.params) as Record<string, unknown>)
+          : (row.params as Record<string, unknown>)
+        : undefined,
     createdAt: row.created_at != null ? Number(row.created_at) : undefined,
   };
 }
@@ -551,15 +557,25 @@ export class PgGovernanceRepository implements GovernanceRepository {
   }
 }
 
-export async function createPostgresRepositories(): Promise<Repositories> {
-  const pool = new Pool({
-    connectionString: env.DATABASE_URL,
-    max: 10,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
-  });
+export interface PostgresRepositoriesOptions {
+  connectionString?: string;
+  autoMigrate?: boolean;
+  autoSeed?: boolean;
+}
 
+/**
+ * Creates Postgres-backed repositories. By default the pool applies pending
+ * migrations and seeds demo data when the database is empty, so a fresh
+ * managed database (e.g. Supabase) is provisioned automatically on boot.
+ */
+export async function createPostgresRepositories(
+  options: PostgresRepositoriesOptions = {},
+): Promise<Repositories> {
+  const connectionString = options.connectionString ?? env.DATABASE_URL;
+  const pool = buildPgPool(connectionString);
   await pool.query("SELECT 1");
+  if (options.autoMigrate ?? env.DB_AUTO_MIGRATE) await runMigrations(pool);
+  if (options.autoSeed ?? env.DB_AUTO_SEED) await seedIfEmpty(pool);
 
   return {
     managers: new PgManagerRepository(pool),

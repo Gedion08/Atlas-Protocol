@@ -34,6 +34,8 @@ jobs:
   backend:
     name: Backend (typecheck, test with coverage, build, migrate)
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://atlas:atlas@localhost:5432/atlas
     services:
       postgres:
         image: postgres:16-alpine
@@ -65,6 +67,10 @@ jobs:
         run: >-
           DATABASE_URL=postgres://atlas:atlas@localhost:5432/atlas
           pnpm --filter atlas-backend db:migrate
+      - name: Postgres repository integration tests
+        run: >-
+          DATABASE_URL=postgres://atlas:atlas@localhost:5432/atlas
+          pnpm --filter atlas-backend test:integration
 
   programs:
     name: Solana programs (clippy, test, build)

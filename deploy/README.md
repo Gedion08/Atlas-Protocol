@@ -114,10 +114,10 @@ After successful initialization, update your application configuration:
 
 ```
 deploy/
-├── deployer.json          # Your deployment wallet keypair (pre-generated)
-├── oracle1.json           # Oracle 1 keypair (for NAV marks)
-├── oracle2.json           # Oracle 2 keypair
-├── oracle3.json           # Oracle 3 keypair
+├── deployer.json          # Your deployment wallet keypair (LOCAL, gitignored — generate via solana-keygen)
+├── oracle1.json           # Oracle 1 keypair (LOCAL, gitignored)
+├── oracle2.json           # Oracle 2 keypair (LOCAL, gitignored)
+├── oracle3.json           # Oracle 3 keypair (LOCAL, gitignored)
 ├── deploy.sh              # Main deployment script
 ├── quick-deploy.sh        # Quick deployment wrapper
 ├── initialize-configs.js  # On-chain configuration script
@@ -128,8 +128,9 @@ deploy/
 ## Wallet Information
 
 - **Deployer**: `AqsVGUdZKd7cKr3KJSW7mTM1BwTyyS4pKqDAT5qDQBnu`
-- **Status**: Pre-generated keypair file included
+- **Status**: Keypair files are generated locally and are **not committed to git** (see `.gitignore`)
 - **Funding**: Needs devnet SOL (airdrop with `solana airdrop`)
+- **Rotation**: If a keypair was previously pushed to GitHub, generate a fresh one and re-fund it
 
 ## What Gets Deployed On-Chain
 
@@ -177,6 +178,9 @@ Required for backend and frontend:
 NODE_ENV=production
 DATABASE_URL=postgresql://postgres:PASSWORD@HOST:5432/DATABASE
 REPOSITORY_DRIVER=postgres
+# Migrations + demo seed run automatically at startup (idempotent)
+DB_AUTO_MIGRATE=true
+DB_AUTO_SEED=true
 ATLAS_REGISTRY_PROGRAM_ID=<REGISTRY_PROGRAM_ID>
 SOLANA_RPC_URL=https://api.devnet.solana.com
 HELIUS_API_KEY=your-helius-api-key
@@ -245,7 +249,9 @@ solana account <PROGRAM_ID> --url https://api.devnet.solana.com
 - Use the default fee configuration in production
 - Skip governance decentralization
 
-⚠️ The deployer keypair (`deploy/deployer.json`) controls all program configurations. Keep it secure.
+⚠️ The deployer keypair (`deploy/deployer.json`) controls all program configurations.
+It is no longer committed to the repository; keep it local and secure. If it was ever
+pushed to GitHub, rotate it immediately (generate a new keypair, redeploy, re-fund).
 
 ---
 

@@ -85,10 +85,18 @@ See `apps/backend/src/env.ts` for the environment contract.
 The backend reads its runtime settings from `apps/backend/src/env.ts`.
 The key values you typically need in deployment are:
 
+- `REPOSITORY_DRIVER` — `memory` for local dev (default) or `postgres` for production
+- `DATABASE_URL` — Postgres/Supabase connection string (`sslmode=require` auto-detected)
+- `DB_AUTO_MIGRATE` — apply pending SQL migrations on backend startup (default `true`)
+- `DB_AUTO_SEED` — seed demo data on startup when the database is empty (default `true`)
 - `ATLAS_REGISTRY_PROGRAM_ID`
 - `SOLANA_RPC_URL`
 - `ORACLE_KEYPAIR` when enabling oracle submission
 - `GOVERNANCE_KEYPAIR` when enabling circuit-breaker submission
+
+Solana keypairs (`ORACLE_KEYPAIR`, `GOVERNANCE_KEYPAIR`, and the `deploy/*.json` devnet
+wallets) are secrets: inject them via environment variables / secret managers, never
+commit them. The `deploy/deployer.json` and `deploy/oracle*.json` files are gitignored.
 
 ## Documentation map
 

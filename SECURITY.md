@@ -32,7 +32,15 @@ Include:
 
 - Programs are escrow-heavy: vault escrow, bond escrow, insurance escrow. All token
   authorities are PDAs with canonical seeds; review signer seeds carefully.
-- `set_score` on manager-registry is currently permissionless (scaffold). It MUST be
-  gated by governance/oracle signatures before any mainnet deployment.
+- `set_score` on manager-registry requires the configured oracle signer on-chain
+  (`SetScore.submitter` must equal `RegistryConfig.oracle`), and the backend REST API
+  exposes oracle submissions as read-only. No permissionless score writes exist.
 - Share pricing is 1:1 until the performance oracle is wired in; do not deploy the
   vault with real assets in this state.
+- Solana keypairs (`deploy/deployer.json`, `deploy/oracle1-3.json`, and backend
+  `ORACLE_KEYPAIR`/`GOVERNANCE_KEYPAIR` values) are secrets. They are gitignored;
+  inject them via environment/secret managers. If any keypair was ever committed,
+  rotate it immediately.
+- A Helius API key was previously committed inside `deploy/devnet-config.json`; the
+  file is now sanitized, but treat any previously published key as compromised and
+  regenerate it in the Helius dashboard.

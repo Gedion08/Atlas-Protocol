@@ -16,3 +16,11 @@ coverage/
 *.log
 *.tsbuildinfo
 .anchor/
+
+# Solana keypairs (secrets) — never commit; inject via env / secret managers
+deploy/deployer.json
+deploy/oracle1.json
+deploy/oracle2.json
+deploy/oracle3.json
+deploy/*.pem
+deploy/*.key

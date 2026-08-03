@@ -53,7 +53,7 @@ pub struct Register<'info> {
 
 pub fn register_handler(ctx: Context<Register>, name: String) -> Result<()> {
     require!(
-        name.as_bytes().len() <= ManagerProfile::MAX_NAME_LEN,
+        name.len() <= ManagerProfile::MAX_NAME_LEN,
         RegistryError::NameTooLong
     );
 

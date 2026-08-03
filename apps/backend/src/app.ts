@@ -1,5 +1,4 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { Pool } from "pg";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { loadEnv, type Env } from "./env.js";
 import { registerSecurity } from "./plugins/security.js";
@@ -16,6 +15,7 @@ import { registerGovernanceRoutes } from "./routes/governance.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { createMemoryRepositories, type Repositories } from "./db/repositories.js";
 import { createPostgresRepositories } from "./db/repositories-pg.js";
+import { buildPgPool } from "./db/bootstrap.js";
 import { eventBus } from "./event-bus.js";
 import {
   ClickHouseTimeSeriesStore,
@@ -56,9 +56,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   const timeSeries =
     options.timeSeries ??
     (env.REPOSITORY_DRIVER === "postgres"
-      ? new PgTimeSeriesStore(
-          new Pool({ connectionString: env.DATABASE_URL, max: 5, idleTimeoutMillis: 30_000 }),
-        )
+      ? new PgTimeSeriesStore(buildPgPool(env.DATABASE_URL, { max: 5 }))
       : env.CLICKHOUSE_ENABLED
         ? new ClickHouseTimeSeriesStore(env.CLICKHOUSE_URL)
         : new InMemoryTimeSeriesStore());

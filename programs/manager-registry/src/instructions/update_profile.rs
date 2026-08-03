@@ -16,7 +16,7 @@ pub struct UpdateProfile<'info> {
 pub fn update_profile_handler(ctx: Context<UpdateProfile>, name: Option<String>) -> Result<()> {
     if let Some(name) = name {
         require!(
-            name.as_bytes().len() <= ManagerProfile::MAX_NAME_LEN,
+            name.len() <= ManagerProfile::MAX_NAME_LEN,
             RegistryError::NameTooLong
         );
         ctx.accounts.profile.name = name;

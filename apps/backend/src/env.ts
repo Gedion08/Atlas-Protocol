@@ -38,6 +38,16 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   REPOSITORY_DRIVER: z.enum(["memory", "postgres"]).default("memory"),
+  /** Apply pending SQL migrations at backend startup when using the postgres driver. */
+  DB_AUTO_MIGRATE: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+  /** Seed demo data on startup only when the database is empty (postgres driver). */
+  DB_AUTO_SEED: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
   CORS_ORIGINS: z.string().default("*"),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   HELIUS_WEBHOOK_SECRET: z.string().optional(),

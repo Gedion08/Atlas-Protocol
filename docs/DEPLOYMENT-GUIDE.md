@@ -272,6 +272,10 @@ Wait 5-10 minutes for provisioning.
 
 ### 4.3. Apply Database Migrations
 
+> **Automatic (recommended):** With `REPOSITORY_DRIVER=postgres`, the backend applies
+> migrations and seeds demo data itself on first startup — both are idempotent and
+> require no manual step. The manual instructions below are only for pre-provisioning.
+
 1. Go to Project Dashboard → SQL editor
 2. Create a new query
 3. Paste the contents of each migration file in order:
@@ -279,6 +283,7 @@ Wait 5-10 minutes for provisioning.
    - `apps/backend/db/migrations/0002_performance.sql`
    - `apps/backend/db/migrations/0003_strategy_uploads.sql`
    - `apps/backend/db/migrations/0004_governance.sql`
+   - `apps/backend/db/migrations/0005_positions.sql`
 4. Click "Run" for each
 
 Alternatively, if you have the local Postgres running:
@@ -346,8 +351,13 @@ BACKEND_PORT=10000
 HOST=0.0.0.0
 
 # Database (from Supabase)
+# Use the "Connection string → URI" value (includes sslmode=require, auto-detected).
+# On Render, prefer the pooler/transaction connection string.
 DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[REGION].supabase.co:5432/postgres
 REPOSITORY_DRIVER=postgres
+# Migrations + demo seed run automatically at startup (idempotent)
+DB_AUTO_MIGRATE=true
+DB_AUTO_SEED=true
 
 # CORS (your frontend domain)
 CORS_ORIGINS=https://atlas-frontend.vercel.app,https://your-frontend.vercel.app
@@ -411,7 +421,7 @@ Render automatically sets up a health check. You can also check manually:
 curl https://your-backend-url.onrender.com/health/ready
 ```
 
-Expected response: `{"status":"ok"}` or similar.
+Expected response: `{"status":"ready","driver":"postgres"}`.
 
 ---
 

@@ -245,7 +245,7 @@ pub fn withdraw_revenue_handler(ctx: Context<WithdrawRevenue>, amount: u64) -> R
         (spent as u128)
             .checked_add(amount as u128)
             .ok_or(TreasuryError::MathOverflow)?
-            <= cap as u128,
+            <= cap,
         TreasuryError::WithdrawCapExceeded
     );
 
@@ -315,6 +315,7 @@ pub struct UpdateConfig<'info> {    #[account(
     pub governance: Signer<'info>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update_config_handler(
     ctx: Context<UpdateConfig>,
     buyback_authority: Option<Pubkey>,

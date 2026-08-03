@@ -15,7 +15,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary"],
       include: ["src/**/*.ts"],
-      exclude: ["src/index.ts", "src/db/seed.ts", "src/config.ts"],
+      exclude: ["src/index.ts", "src/db/seed.ts", "src/db/bootstrap.ts", "src/config.ts"],
       thresholds: {
         lines: 60,
         functions: 60,

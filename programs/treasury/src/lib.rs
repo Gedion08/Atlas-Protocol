@@ -34,6 +34,7 @@ pub mod atlas_treasury {
         withdraw_revenue_handler(ctx, amount)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_config(
         ctx: Context<UpdateConfig>,
         buyback_authority: Option<Pubkey>,

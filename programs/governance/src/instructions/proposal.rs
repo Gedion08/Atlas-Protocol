@@ -32,7 +32,7 @@ pub fn create_proposal_handler(
     instruction_data: Vec<u8>,
 ) -> Result<()> {
     require!(
-        title.as_bytes().len() <= MAX_TITLE_LEN,
+        title.len() <= MAX_TITLE_LEN,
         GovernanceError::InvalidClass
     );
     require!(
@@ -171,7 +171,11 @@ pub fn finalize_proposal_handler(ctx: Context<FinalizeProposal>) -> Result<()> {
     require!(cast >= proposal.quorum_weight, GovernanceError::QuorumNotMet);
 
     let passage = proposal.class.passage_percent() as u128;
-    let for_pct = if cast > 0 { proposal.for_votes * 100 / cast } else { 0 };
+    let for_pct = proposal
+        .for_votes
+        .checked_mul(100)
+        .and_then(|n| n.checked_div(cast))
+        .unwrap_or(0);
     proposal.status = if for_pct >= passage {
         ProposalStatus::Succeeded
     } else {

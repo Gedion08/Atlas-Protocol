@@ -39,7 +39,7 @@ pub struct CreateLock<'info> {
 pub fn create_lock_handler(ctx: Context<CreateLock>, amount: u64, duration_secs: i64) -> Result<()> {
     require!(amount > 0, GovernanceError::ZeroAmount);
     require!(
-        duration_secs >= MIN_LOCK_SECS && duration_secs <= MAX_LOCK_SECS,
+        (MIN_LOCK_SECS..=MAX_LOCK_SECS).contains(&duration_secs),
         GovernanceError::InvalidLockDuration
     );
 
@@ -114,7 +114,7 @@ pub fn extend_lock_handler(
         GovernanceError::LockExpired
     );
     require!(
-        new_duration_secs >= MIN_LOCK_SECS && new_duration_secs <= MAX_LOCK_SECS,
+        (MIN_LOCK_SECS..=MAX_LOCK_SECS).contains(&new_duration_secs),
         GovernanceError::InvalidLockDuration
     );
 

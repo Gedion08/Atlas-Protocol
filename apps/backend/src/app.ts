@@ -32,12 +32,14 @@ import {
   DryRunCircuitBreakerSubmitter,
   SolanaCircuitBreakerSubmitter,
 } from "./services/circuit-breaker/index.js";
+import { VaultClient } from "./services/vault/index.js";
 
 export interface BuildAppOptions {
   env?: Env;
   logger?: boolean | object;
   repositories?: Repositories;
   timeSeries?: TimeSeriesStore;
+  vaultClient?: VaultClient;
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -69,6 +71,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   const aggregator = new MetricsAggregator(timeSeries);
   eventBus.subscribe((event) => void aggregator.ingest([event]));
+
+  const vaultClient =
+    options.vaultClient ??
+    new VaultClient(
+      new Connection(env.SOLANA_RPC_URL, "confirmed"),
+      new PublicKey(env.ATLAS_VAULT_PROGRAM_ID),
+    );
 
   let indexer: Indexer | null = null;
   if (env.KAFKA_ENABLED) {
@@ -152,8 +161,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   app.register(async (scoped) => {
     scoped.register(async (r) => registerHealthRoutes(r, repositories, env));
-    scoped.register(async (r) => registerVaultRoutes(r, repositories));
-    scoped.register(async (r) => registerInvestorRoutes(r, repositories));
+    scoped.register(async (r) => registerVaultRoutes(r, repositories, vaultClient));
+    scoped.register(async (r) => registerInvestorRoutes(r, repositories, undefined, vaultClient));
     scoped.register(async (r) => registerManagerRoutes(r, repositories));
     scoped.register(async (r) => registerStrategyRoutes(r, repositories));
     scoped.register(async (r) => registerLeaderboardRoutes(r, repositories));

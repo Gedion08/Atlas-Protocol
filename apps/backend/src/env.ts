@@ -31,7 +31,11 @@ const envSchema = z.object({
   CIRCUIT_BREAKER_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   ATLAS_REGISTRY_PROGRAM_ID: z
     .string()
-    .default("9h29CPwoYFgQ4wYN2oWWCyA9rS3nMYaeS99Y676zSGa8"),
+    .default("CgLpJydFMSrkAHLjhmEZX3pFF4M5BC8CY36ajBe2bvTs"),
+  /** on-chain atlas-vault program id (deployed on devnet). */
+  ATLAS_VAULT_PROGRAM_ID: z
+    .string()
+    .default("BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR"),
   KAFKA_BROKERS: z.string().default("localhost:9092"),
   KAFKA_ENABLED: z
     .string()

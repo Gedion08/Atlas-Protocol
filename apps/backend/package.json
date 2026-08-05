@@ -12,7 +12,9 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run tests/postgres.integration.test.ts",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "bootstrap:devnet": "tsx scripts/bootstrap.ts",
+    "e2e:devnet": "tsx scripts/e2e.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
@@ -21,6 +23,7 @@
     "@fastify/swagger": "^9.4.2",
     "@fastify/swagger-ui": "^5.2.0",
     "@fastify/websocket": "^11.0.1",
+    "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.98.0",
     "atlas-types": "workspace:*",
     "bs58": "^6.0.0",

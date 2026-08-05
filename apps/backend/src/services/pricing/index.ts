@@ -12,7 +12,7 @@ export interface SharePricing {
  * than a 1:1 peg (roadmap §Phase 2: "wire vault share pricing to oracle"). */
 export function computeSharePricing(vault: Vault, now = Date.now()): SharePricing {
   const shares = Math.max(0, vault.sharesOutstanding);
-  const sharePrice = shares > 0 ? vault.tvl / shares : 0;
+  const sharePrice = vault.sharePrice ?? (shares > 0 ? vault.tvl / shares : 0);
   return {
     sharePrice,
     tvl: vault.tvl,

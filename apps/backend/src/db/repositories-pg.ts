@@ -6,6 +6,7 @@ import type {
   LeaderboardEntry,
   ManagerPerformance,
   ManagerProfile,
+  OnchainVaultMeta,
   PerformancePoint,
   ProposalInput,
   ProposalStatus,
@@ -18,7 +19,7 @@ import type {
 import type { Pool } from "pg";
 import { env } from "../env.js";
 import type { OracleSubmission } from "../services/oracle/index.js";
-import { buildPgPool, runMigrations, seedIfEmpty } from "./bootstrap.js";
+import { buildPgPool, runMigrations, seedIfEmpty, upsertBootstrapVault } from "./bootstrap.js";
 import { classParams, lockWeight, VOTING_DURATION_SECS } from "../services/governance/index.js";
 import type {
   GovernanceRepository,
@@ -113,6 +114,7 @@ function toVault(row: Record<string, unknown>): Vault {
     allocation: null,
     createdAt: Number(row.created_at),
     lastRebalanceAt: Number(row.last_rebalance_at),
+    onchain: (row.onchain as OnchainVaultMeta | null) ?? undefined,
   };
 }
 
@@ -576,6 +578,7 @@ export async function createPostgresRepositories(
   await pool.query("SELECT 1");
   if (options.autoMigrate ?? env.DB_AUTO_MIGRATE) await runMigrations(pool);
   if (options.autoSeed ?? env.DB_AUTO_SEED) await seedIfEmpty(pool);
+  await upsertBootstrapVault(pool);
 
   return {
     managers: new PgManagerRepository(pool),

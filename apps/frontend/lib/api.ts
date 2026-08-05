@@ -59,6 +59,15 @@ export function buildSignatureHeaders(input: {
   };
 }
 
+export type InvestAction = "deposit" | "request_withdraw" | "settle_withdraw";
+
+/** Backend-assembled on-chain transaction awaiting a wallet signature. */
+export interface BuildInvestResult {
+  transaction: string;
+  blockhash: string;
+  ataAccounts: string[];
+}
+
 const fallbackManagers: ManagerProfile[] = [
   {
     id: "mgr_quantum",
@@ -494,5 +503,16 @@ export const api = {
       `/api/v1/vaults/${vaultAddress}/withdraw`,
       input,
       auth ? buildSignatureHeaders(auth) : undefined,
+    ),
+  /** Assembles an on-chain invest transaction for the connected wallet to sign/send. */
+  buildInvestTransaction: async (
+    vaultAddress: string,
+    input: { action: InvestAction; amount?: number; shares?: number },
+    owner: string,
+  ): Promise<BuildInvestResult> =>
+    post<BuildInvestResult>(
+      `/api/v1/vaults/${vaultAddress}/invest/build`,
+      input,
+      { "x-atlas-owner": owner },
     ),
 };

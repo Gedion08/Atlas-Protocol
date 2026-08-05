@@ -10,9 +10,9 @@ import {
 import type { OracleSubmission, OracleSubmitter } from "./index.js";
 import { withRetry } from "../../utils/retry.js";
 
-/** on-chain atlas-manager-registry program id */
+/** on-chain atlas-manager-registry program id (deployed on devnet). */
 export const REGISTRY_PROGRAM_ID = new PublicKey(
-  "9h29CPwoYFgQ4wYN2oWWCyA9rS3nMYaeS99Y676zSGa8",
+  "CgLpJydFMSrkAHLjhmEZX3pFF4M5BC8CY36ajBe2bvTs",
 );
 
 /** anchor discriminator for `set_score`: sha256("global:set_score")[..8] */

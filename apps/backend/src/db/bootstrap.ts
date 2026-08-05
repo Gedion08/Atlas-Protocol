@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Pool, type PoolConfig } from "pg";
+import { bootstrapVault, readBootstrapState } from "./bootstrap-state.js";
 import {
   seedLocks,
   seedManagers,
@@ -214,4 +215,37 @@ export async function seedIfEmpty(pool: Pool): Promise<boolean> {
   if (Number(rows[0]?.count ?? 0) > 0) return false;
   await runSeed(pool);
   return true;
+}
+
+/**
+ * Upserts the on-chain vault (and its manager profile key) recorded by
+ * `deploy/bootstrap-state.json`, so the API lists it even when the demo seed
+ * already ran. No-op when the bootstrap never executed on this checkout.
+ */
+export async function upsertBootstrapVault(pool: Pool): Promise<void> {
+  const state = readBootstrapState();
+  if (!state) return;
+  const vault = bootstrapVault(state);
+
+  await pool.query(
+    `INSERT INTO managers (id, owner, name, status, created_at, updated_at)
+     VALUES ($1, $2, $3, 'active', $4, $4)
+     ON CONFLICT (id) DO NOTHING`,
+    [state.manager.profilePda, state.manager.owner, state.manager.name, state.generatedAt],
+  );
+
+  await pool.query(
+    `INSERT INTO vaults (
+      address, name, base_asset, manager_id, authority, status,
+      tvl, apy, shares_outstanding, management_fee_bps, performance_fee_bps,
+      min_deposit, created_at, last_rebalance_at, onchain
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+    ON CONFLICT (address) DO NOTHING`,
+    [
+      vault.address, vault.name, vault.baseAsset, vault.managerId, vault.authority, vault.status,
+      vault.tvl, vault.apy, vault.sharesOutstanding, vault.managementFeeBps,
+      vault.performanceFeeBps, vault.minDeposit, vault.createdAt, vault.lastRebalanceAt,
+      JSON.stringify(state.vault),
+    ],
+  );
 }

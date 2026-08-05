@@ -199,6 +199,7 @@ impl Vault {
         + 8
         + 8
         + 8
+        + 8
         + 1;
 
     /// Investor-visible NAV = gross value net of all accrued fees and insurance.
@@ -364,6 +365,36 @@ mod tests {
             rebalance_count: 0,
             oracle_marked: false,
         }
+    }
+
+    #[test]
+    fn account_spaces_match_serialized_size() {
+        let vault = test_vault();
+        assert_eq!(vault.try_to_vec().unwrap().len() + 8, Vault::SPACE);
+        let config = Config {
+            governance: Pubkey::default(),
+            oracles: [Pubkey::default(); MAX_ORACLES],
+            min_oracle_signatures: 0,
+            risk_engine: Pubkey::default(),
+            treasury: Pubkey::default(),
+            insurance: Pubkey::default(),
+            veatlas: Pubkey::default(),
+            mgmt_fee_cap_bps: 0,
+            perf_fee_cap_bps: 0,
+            premium_cap_bps: 0,
+            protocol_mgmt_share_bps: 0,
+            protocol_perf_share_bps: 0,
+            insurance_share_bps: 0,
+            treasury_share_bps: 0,
+            veatlas_share_bps: 0,
+            co_pay_bps: 0,
+            reserve_target: 0,
+            settlement_slots: 0,
+            deferral_secs: 0,
+            max_value_move_bps: 0,
+            bump: 0,
+        };
+        assert_eq!(config.try_to_vec().unwrap().len() + 8, Config::SPACE);
     }
 
     #[test]

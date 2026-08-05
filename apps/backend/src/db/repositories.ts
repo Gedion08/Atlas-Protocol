@@ -18,6 +18,7 @@ import type {
 import type { OracleSubmission } from "../services/oracle/index.js";
 import type { TimeSeriesStore } from "../services/ingestion/timeseries.js";
 import { seedLocks, seedManagers, seedProposals, seedStrategies, seedVaults } from "./seed.js";
+import { bootstrapVault, readBootstrapState } from "./bootstrap-state.js";
 import { classParams, lockWeight, resolveProposal, VOTING_DURATION_SECS } from "../services/governance/index.js";
 import { computePerfMetrics } from "../services/perf-metrics/index.js";
 
@@ -407,10 +408,12 @@ export class InMemoryInvestorRepository implements InvestorRepository {
 export function createMemoryRepositories(
   timeSeries?: TimeSeriesStore,
 ): Repositories {
+  const state = readBootstrapState();
+  const vaults = state ? [...seedVaults, bootstrapVault(state)] : seedVaults;
   return {
     managers: new InMemoryManagerRepository(seedManagers, timeSeries),
     strategies: new InMemoryStrategyRepository(seedStrategies),
-    vaults: new InMemoryVaultRepository(seedVaults),
+    vaults: new InMemoryVaultRepository(vaults),
     investors: new InMemoryInvestorRepository(),
     oracle: new InMemoryOracleRepository(),
     governance: new InMemoryGovernanceRepository(seedProposals, seedLocks),

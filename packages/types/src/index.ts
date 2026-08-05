@@ -175,6 +175,30 @@ export interface AllocationResult {
   generatedAt: number;
 }
 
+/**
+ * On-chain metadata for a vault whose deposits/withdrawals transact through the
+ * deployed `atlas-vault` program. Absent for demo vaults, which keep the legacy
+ * message-signed, DB-ledger flow.
+ */
+export interface OnchainVaultMeta {
+  /** atlas-vault program id. */
+  programId: Address;
+  /** PDA of the vault account: ["atlas_vault", authority, base_mint]. */
+  vaultPda: Address;
+  /** Protocol-side deployer / vault owner. */
+  authority: Address;
+  /** Linked on-chain manager profile PDA: ["manager", manager_owner]. */
+  managerProfile: Address;
+  /** Base token mint (deposits are this token). */
+  baseMint: Address;
+  /** Vault escrow token account PDA: ["escrow", vault, base_mint]. */
+  escrowPda: Address;
+  /** Vault shares mint PDA: ["shares", vault]. */
+  sharesMint: Address;
+  /** Base mint decimals (deposits in base units = amount * 10^decimals). */
+  decimals: number;
+}
+
 export interface Vault {
   address: Address;
   name: string;
@@ -185,12 +209,16 @@ export interface Vault {
   tvl: number;
   apy: number;
   sharesOutstanding: number;
+  /** NAV/share in display units (on-chain vaults carry the oracle-attested value). */
+  sharePrice?: number;
   managementFeeBps: number;
   performanceFeeBps: number;
   minDeposit: number;
   allocation: AllocationResult | null;
   createdAt: number;
   lastRebalanceAt: number;
+  /** Present only for on-chain vaults (see {@link OnchainVaultMeta}). */
+  onchain?: OnchainVaultMeta;
 }
 
 export interface PerformancePoint {
@@ -337,6 +365,12 @@ export interface InvestorPosition {
   sharePrice: number;
   status: PositionStatus;
   createdAt: number;
+  /** On-chain vaults only: base tokens (base units) claimable now via settle. */
+  claimable?: number;
+  /** On-chain vaults only: shares locked in an outstanding withdrawal request. */
+  pendingShares?: number;
+  /** On-chain vaults only: slot after which the pending request can be settled. */
+  settlementSlot?: number;
 }
 
 export interface DepositInput {

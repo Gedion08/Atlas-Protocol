@@ -7,6 +7,9 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 /// on the first offense → `Banned` with registry revocation on the second.
 /// Funds route to the staking insurance escrow. Requires the staking program's
 /// `slash_authority` to be configured to this registry's `slash_authority`.
+/// All staking-domain accounts (config, bond, escrow, insurance escrow) are
+/// referenced at their staking-derived PDAs, matching what `atlas_staking::slash`
+/// enforces on the CPI side.
 #[derive(Accounts)]
 pub struct SlashBond<'info> {
     #[account(
@@ -15,11 +18,7 @@ pub struct SlashBond<'info> {
         constraint = slash_authority.key() == config.slash_authority @ RegistryError::Unauthorized
     )]
     pub config: Box<Account<'info, RegistryConfig>>,
-    #[account(
-        mut,
-        seeds = [b"atlas_staking_config"],
-        bump = staking_config.bump
-    )]
+    #[account(mut)]
     pub staking_config: Box<Account<'info, atlas_staking::state::Config>>,
     #[account(
         mut,
@@ -28,29 +27,17 @@ pub struct SlashBond<'info> {
         constraint = profile.status != ManagerStatus::Inactive @ RegistryError::NotActive
     )]
     pub profile: Box<Account<'info, ManagerProfile>>,
-    #[account(
-        mut,
-        seeds = [b"bond", bond.owner.as_ref()],
-        bump = bond.bump
-    )]
+    #[account(mut)]
     pub bond: Box<Account<'info, atlas_staking::state::BondAccount>>,
     #[account(
         mut,
         token::mint = bond_mint,
-        token::authority = bond,
-        seeds = [b"escrow", bond.key().as_ref()],
-        bump
+        token::authority = bond
     )]
     pub bond_escrow: Box<Account<'info, TokenAccount>>,
-    #[account(
-        init_if_needed,
-        payer = slash_authority,
-        token::mint = bond_mint,
-        token::authority = staking_config,
-        seeds = [b"insurance_escrow", staking_config.key().as_ref()],
-        bump
-    )]
-    pub insurance_escrow: Box<Account<'info, TokenAccount>>,
+    /// Staking insurance escrow; `atlas_staking::slash` creates it if needed.
+    #[account(mut)]
+    pub insurance_escrow: UncheckedAccount<'info>,
     pub bond_mint: Box<Account<'info, Mint>>,
     #[account(mut)]
     pub slash_authority: Signer<'info>,
@@ -65,6 +52,30 @@ pub fn slash_bond_handler(ctx: Context<SlashBond>, amount: u64) -> Result<()> {
         RegistryError::Unauthorized
     );
     require!(amount > 0, RegistryError::Unauthorized);
+
+    let (expected_staking_config, _) =
+        Pubkey::find_program_address(&[b"atlas_staking_config"], &atlas_staking::ID);
+    require!(
+        ctx.accounts.staking_config.key() == expected_staking_config,
+        RegistryError::Unauthorized
+    );
+    let bond_owner = ctx.accounts.bond.owner;
+    let (expected_bond, _) = Pubkey::find_program_address(
+        &[b"bond", bond_owner.as_ref()],
+        &atlas_staking::ID,
+    );
+    require!(
+        ctx.accounts.bond.key() == expected_bond,
+        RegistryError::Unauthorized
+    );
+    let (expected_escrow, _) = Pubkey::find_program_address(
+        &[b"escrow", ctx.accounts.bond.key().as_ref()],
+        &atlas_staking::ID,
+    );
+    require!(
+        ctx.accounts.bond_escrow.key() == expected_escrow,
+        RegistryError::Unauthorized
+    );
 
     let cpi_accounts = atlas_staking::cpi::accounts::SlashBond {
         config: ctx.accounts.staking_config.to_account_info(),

@@ -223,7 +223,19 @@ export default function InvestPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {position.status === "active" && vault ? (
+                        {(position.claimable ?? 0) > 0 && vault ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setActiveVault(vault);
+                              setDialogMode("withdraw");
+                              setWithdrawPosition(position);
+                            }}
+                          >
+                            Settle
+                          </Button>
+                        ) : position.status === "active" && vault ? (
                           <Button
                             size="sm"
                             variant="outline"

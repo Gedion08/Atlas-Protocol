@@ -3,12 +3,14 @@ import { z } from "zod";
 import type { Repositories } from "../db/repositories.js";
 import { allocate, DEFAULT_ALLOCATION_CONSTRAINTS } from "../services/allocation/index.js";
 import { computeSharePricing } from "../services/pricing/index.js";
+import type { VaultClient } from "../services/vault/index.js";
 
 const addressParam = z.object({ address: z.string().min(1) });
 
 export async function registerVaultRoutes(
   app: FastifyInstance,
   repos: Repositories,
+  vaultClient?: VaultClient,
 ): Promise<void> {
   app.get(
     "/api/v1/vaults",
@@ -21,7 +23,8 @@ export async function registerVaultRoutes(
       },
     },
     async () => {
-      const vaults = await repos.vaults.list();
+      const raw = await repos.vaults.list();
+      const vaults = vaultClient ? await vaultClient.listVaults(raw) : raw;
       return {
         data: vaults.map((v) => ({
           ...v,
@@ -45,8 +48,9 @@ export async function registerVaultRoutes(
     },
     async (request, reply) => {
       const { address } = addressParam.parse(request.params);
-      const vault = await repos.vaults.get(address);
+      let vault = await repos.vaults.get(address);
       if (!vault) return reply.status(404).send({ error: "vault_not_found", message: "Vault not found", statusCode: 404 });
+      if (vaultClient) vault = await vaultClient.enrichVault(vault);
       return { data: vault };
     },
   );
@@ -78,8 +82,9 @@ export async function registerVaultRoutes(
     },
     async (request, reply) => {
       const { address } = addressParam.parse(request.params);
-      const vault = await repos.vaults.get(address);
+      let vault = await repos.vaults.get(address);
       if (!vault) return reply.status(404).send({ error: "vault_not_found", message: "Vault not found", statusCode: 404 });
+      if (vaultClient) vault = await vaultClient.enrichVault(vault);
       return { data: computeSharePricing(vault) };
     },
   );

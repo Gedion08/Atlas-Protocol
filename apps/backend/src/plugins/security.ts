@@ -22,10 +22,23 @@ export async function registerSecurity(app: FastifyInstance): Promise<void> {
     }),
   });
 
+  const corsOrigins = env.CORS_ORIGINS === "*" ? true : env.CORS_ORIGINS.split(",");
+  app.log.info(
+    { origins: corsOrigins, raw: env.CORS_ORIGINS },
+    "registering CORS",
+  );
+
   await app.register(import("@fastify/cors"), {
-    origin: env.CORS_ORIGINS === "*" ? true : env.CORS_ORIGINS.split(","),
+    origin: corsOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-atlas-owner",
+      "x-atlas-nonce",
+      "x-atlas-signature",
+    ],
+    exposedHeaders: ["Content-Type", "Authorization"],
     maxAge: 86_400,
   });
 }

@@ -36,6 +36,10 @@ const envSchema = z.object({
   ATLAS_VAULT_PROGRAM_ID: z
     .string()
     .default("BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR"),
+  /** on-chain governance program id (deployed on devnet). */
+  ATLAS_GOVERNANCE_PROGRAM_ID: z
+    .string()
+    .default("5fcfpz4DK8G4HbPMyX259fgotXJaE4v7yNhXidRAtWnD"),
   KAFKA_BROKERS: z.string().default("localhost:9092"),
   KAFKA_ENABLED: z
     .string()

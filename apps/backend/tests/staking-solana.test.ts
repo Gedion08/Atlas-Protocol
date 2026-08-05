@@ -6,8 +6,8 @@ import {
   BOND_DISCRIMINATOR,
   buildBondInstruction,
   STAKING_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
 } from "../src/services/staking/solana.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 const owner = Keypair.generate();
 const bondMint = Keypair.generate().publicKey;
@@ -34,7 +34,9 @@ describe("staking PDAs", () => {
 describe("staking bond instruction", () => {
   it("lays out accounts and serializes the amount", () => {
     const instruction = buildBondInstruction({
-      accounts: { bond, bondEscrow: escrow, bondMint, owner: owner.publicKey, ownerToken },
+      owner: owner.publicKey,
+      bondMint,
+      ownerToken,
       amount: 1_000_000_000n,
     });
 

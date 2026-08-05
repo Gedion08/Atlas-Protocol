@@ -12,6 +12,7 @@ import { registerLeaderboardRoutes } from "./routes/leaderboard.js";
 import { registerInvestorRoutes } from "./routes/investors.js";
 import { registerOracleRoutes } from "./routes/oracle.js";
 import { registerGovernanceRoutes } from "./routes/governance.js";
+import { registerGovernanceExecutionRoutes } from "./routes/governance-execution.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { createMemoryRepositories, type Repositories } from "./db/repositories.js";
 import { createPostgresRepositories } from "./db/repositories-pg.js";
@@ -168,6 +169,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     scoped.register(async (r) => registerLeaderboardRoutes(r, repositories));
     scoped.register(async (r) => registerOracleRoutes(r, repositories));
     scoped.register(async (r) => registerGovernanceRoutes(r, repositories));
+    scoped.register(async (r) => registerGovernanceExecutionRoutes(r, repositories));
     scoped.register(async (r) => registerWebhookRoutes(r, env));
   });
 

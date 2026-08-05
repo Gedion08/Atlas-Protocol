@@ -110,6 +110,11 @@ export const api = {
     post<GovernanceProposal>("/api/v1/governance/proposals", input),
   castVote: async (id: string, vote: VoteInput): Promise<GovernanceProposal> =>
     post<GovernanceProposal>(`/api/v1/governance/proposals/${id}/votes`, vote),
+  executeProposal: async (id: string, executor: string): Promise<{ signature: string; proposalId: string; status: string }> =>
+    post<{ signature: string; proposalId: string; status: string }>(
+      `/api/v1/governance/proposals/${id}/execute`,
+      { proposalId: id, executor },
+    ),
   locks: async (): Promise<VeLockView[] | null> =>
     get<VeLockView[]>("/api/v1/governance/locks"),
   votes: async (id: string): Promise<GovernanceVote[]> =>

@@ -1,79 +1,123 @@
 import { createHash } from "node:crypto";
-import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
-/** on-chain atlas-staking program id (deployed on devnet). */
 export const STAKING_PROGRAM_ID = new PublicKey(
   "4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H",
 );
 
-export { TOKEN_PROGRAM_ID };
+export const BOND_DISCRIMINATOR: Uint8Array = createHash("sha256")
+  .update("global:bond")
+  .digest()
+  .subarray(0, 8);
+export const UNBOND_DISCRIMINATOR: Uint8Array = createHash("sha256")
+  .update("global:unbond")
+  .digest()
+  .subarray(0, 8);
+export const CLAIM_DISCRIMINATOR: Uint8Array = createHash("sha256")
+  .update("global:claim")
+  .digest()
+  .subarray(0, 8);
 
-/** anchor discriminator for `bond` */
-export const BOND_DISCRIMINATOR: Uint8Array = discriminator("bond");
-
-function discriminator(name: string): Uint8Array {
-  return createHash("sha256").update(`global:${name}`).digest().subarray(0, 8);
-}
-
-// ---------------------------------------------------------------------------
-// PDAs (seed schemes verified against programs/staking/src/state.rs)
-// ---------------------------------------------------------------------------
-
-export function bondPda(
-  owner: PublicKey,
-  programId: PublicKey = STAKING_PROGRAM_ID,
-): [PublicKey, number] {
+export function bondPda(owner: PublicKey, programId: PublicKey = STAKING_PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([Buffer.from("bond"), owner.toBuffer()], programId);
 }
 
-export function bondEscrowPda(
-  bond: PublicKey,
-  programId: PublicKey = STAKING_PROGRAM_ID,
-): [PublicKey, number] {
+export function bondEscrowPda(bond: PublicKey, programId: PublicKey = STAKING_PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([Buffer.from("escrow"), bond.toBuffer()], programId);
 }
 
-/** `["atlas_staking_config"]` config PDA (not required by `bond`). */
-export function stakingConfigPda(programId: PublicKey = STAKING_PROGRAM_ID): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync([Buffer.from("atlas_staking_config")], programId);
-}
-
-// ---------------------------------------------------------------------------
-// Instruction builders
-// ---------------------------------------------------------------------------
-
-/** Locks `amount` of `bondMint` into the staking bond escrow, creating the
- * bond + escrow accounts at staking-derived PDAs (pre-requisite for the
- * registry `register` instruction). */
 export function buildBondInstruction(args: {
   programId?: PublicKey;
-  accounts: {
-    bond: PublicKey;
-    bondEscrow: PublicKey;
-    bondMint: PublicKey;
-    owner: PublicKey;
-    ownerToken: PublicKey;
-    systemProgram?: PublicKey;
-    tokenProgram?: PublicKey;
-  };
-  amount: number | bigint;
+  owner: PublicKey;
+  bondMint: PublicKey;
+  ownerToken: PublicKey;
+  amount: bigint | number;
 }): TransactionInstruction {
   const programId = args.programId ?? STAKING_PROGRAM_ID;
-  const a = args.accounts;
-  const amount = Buffer.alloc(8);
-  amount.writeBigUInt64LE(BigInt(args.amount));
+  const [bondPdaKey] = bondPda(args.owner, programId);
+  const [escrowPda] = bondEscrowPda(bondPdaKey, programId);
+  const amountBuffer = Buffer.alloc(8);
+  amountBuffer.writeBigUInt64LE(BigInt(args.amount));
+
   return new TransactionInstruction({
     programId,
     keys: [
-      { pubkey: a.bond, isSigner: false, isWritable: true },
-      { pubkey: a.bondEscrow, isSigner: false, isWritable: true },
-      { pubkey: a.bondMint, isSigner: false, isWritable: false },
-      { pubkey: a.owner, isSigner: true, isWritable: true },
-      { pubkey: a.ownerToken, isSigner: false, isWritable: true },
-      { pubkey: a.systemProgram ?? SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: a.tokenProgram ?? TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: bondPdaKey, isSigner: false, isWritable: true },
+      { pubkey: escrowPda, isSigner: false, isWritable: true },
+      { pubkey: args.bondMint, isSigner: false, isWritable: false },
+      { pubkey: args.owner, isSigner: true, isWritable: true },
+      { pubkey: args.ownerToken, isSigner: false, isWritable: true },
+      { pubkey: PublicKey.default, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.concat([BOND_DISCRIMINATOR, amount]),
+    data: Buffer.concat([BOND_DISCRIMINATOR, amountBuffer]),
   });
+}
+
+export function buildUnbondInstruction(args: {
+  programId?: PublicKey;
+  owner: PublicKey;
+}): TransactionInstruction {
+  const programId = args.programId ?? STAKING_PROGRAM_ID;
+  const [bondPdaKey] = bondPda(args.owner, programId);
+  const [configPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("atlas_staking_config")],
+    programId,
+  );
+
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: bondPdaKey, isSigner: false, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: false },
+      { pubkey: args.owner, isSigner: true, isWritable: false },
+    ],
+    data: Buffer.from(UNBOND_DISCRIMINATOR),
+  });
+}
+
+export function buildClaimInstruction(args: {
+  programId?: PublicKey;
+  owner: PublicKey;
+  bondMint: PublicKey;
+  ownerToken: PublicKey;
+}): TransactionInstruction {
+  const programId = args.programId ?? STAKING_PROGRAM_ID;
+  const [bondPdaKey] = bondPda(args.owner, programId);
+  const [escrowPda] = bondEscrowPda(bondPdaKey, programId);
+
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: bondPdaKey, isSigner: false, isWritable: true },
+      { pubkey: escrowPda, isSigner: false, isWritable: true },
+      { pubkey: args.bondMint, isSigner: false, isWritable: false },
+      { pubkey: args.owner, isSigner: true, isWritable: true },
+      { pubkey: args.ownerToken, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from(CLAIM_DISCRIMINATOR),
+  });
+}
+
+export async function buildBondTransaction(args: {
+  connection: Connection;
+  ownerKeypair: Keypair;
+  bondMint: PublicKey;
+  ownerToken: PublicKey;
+  amount: bigint | number;
+  programId?: PublicKey;
+}): Promise<Transaction> {
+  const instruction = buildBondInstruction({
+    programId: args.programId,
+    owner: args.ownerKeypair.publicKey,
+    bondMint: args.bondMint,
+    ownerToken: args.ownerToken,
+    amount: args.amount,
+  });
+  const tx = new Transaction().add(instruction);
+  tx.feePayer = args.ownerKeypair.publicKey;
+  tx.recentBlockhash = (await args.connection.getLatestBlockhash()).blockhash;
+  return tx;
 }

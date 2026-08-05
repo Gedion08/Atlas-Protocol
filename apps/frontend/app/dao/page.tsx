@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Landmark, ShieldCheck, Users, Vote } from "lucide-react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -225,7 +226,7 @@ export default function DaoPage() {
                 <div key={p.id} className="rounded-md border border-border p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-medium">{p.title}</h3>
+                      <Link href={`/dao/${p.id}`} className="hover:text-primary"><h3 className="font-medium">{p.title}</h3></Link>
                       {classBadge(p.class)}
                       {statusBadge(p.status)}
                     </div>

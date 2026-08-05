@@ -127,7 +127,12 @@ export default function InvestPage() {
                       <CardTitle>{vault.name}</CardTitle>
                       <CardDescription>{vault.baseAsset} vault</CardDescription>
                     </div>
-                    <Badge variant="positive">{formatApy(vault.apy)} APY</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {vault.onchain && (
+                        <Badge variant="outline" className="text-xs">On-chain</Badge>
+                      )}
+                      <Badge variant="positive">{formatApy(vault.apy)} APY</Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

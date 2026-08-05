@@ -229,15 +229,11 @@ async function main(): Promise<void> {
       await send(
         [
           buildBondInstruction({
-            programId: stakingProgramId,
-            accounts: {
-              bond: bondPdaKey,
-              bondEscrow: bondEscrowPdaKey,
-              bondMint,
-              owner: manager.publicKey,
-              ownerToken: managerToken.address,
-            },
+            owner: manager.publicKey,
+            bondMint,
+            ownerToken: managerToken.address,
             amount: BigInt(config.config.bondAmount),
+            programId: stakingProgramId,
           }),
         ],
         manager,

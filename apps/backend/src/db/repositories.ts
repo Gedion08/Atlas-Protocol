@@ -66,6 +66,7 @@ export interface GovernanceRepository {
   castVote(proposalId: string, vote: VoteInput): Promise<GovernanceProposal | null>;
   listLocks(): Promise<VeLockView[]>;
   listVotes(proposalId?: string): Promise<GovernanceVote[]>;
+  updateProposalStatus(id: string, status: ProposalStatus): Promise<void>;
 }
 
 export interface Repositories {
@@ -254,6 +255,13 @@ export class InMemoryGovernanceRepository implements GovernanceRepository {
 
   async listLocks(): Promise<VeLockView[]> {
     return this.locks;
+  }
+
+  async updateProposalStatus(id: string, status: ProposalStatus): Promise<void> {
+    const proposal = this.proposals.find((p) => p.id === id);
+    if (proposal) {
+      proposal.status = status;
+    }
   }
 
   async listVotes(proposalId?: string): Promise<GovernanceVote[]> {

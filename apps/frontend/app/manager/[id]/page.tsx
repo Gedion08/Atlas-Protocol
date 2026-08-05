@@ -204,7 +204,12 @@ export default function ManagerPage() {
                         <p className="font-semibold">{vault.name}</p>
                         <p className="text-xs text-muted-foreground">{vault.baseAsset} · oracle-priced shares</p>
                       </div>
-                      <Badge variant="positive">{formatApy(vault.apy)} APY</Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {vault.onchain && (
+                          <Badge variant="outline" className="text-xs">On-chain</Badge>
+                        )}
+                        <Badge variant="positive">{formatApy(vault.apy)} APY</Badge>
+                      </div>
                     </div>
                     <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
                       <div>

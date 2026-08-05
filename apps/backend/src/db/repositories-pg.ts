@@ -551,6 +551,10 @@ export class PgGovernanceRepository implements GovernanceRepository {
     return result.rows.map(toLock);
   }
 
+  async updateProposalStatus(id: string, status: ProposalStatus): Promise<void> {
+    await this.pool.query("UPDATE proposals SET status = $1 WHERE id = $2", [status, id]);
+  }
+
   async listVotes(proposalId?: string): Promise<GovernanceVote[]> {
     const result = proposalId
       ? await this.pool.query("SELECT * FROM proposal_votes WHERE proposal_id = $1", [proposalId])

@@ -56,7 +56,7 @@ const envSchema = z.object({
     .string()
     .default("false")
     .transform((v) => v === "true"),
-  CORS_ORIGINS: z.string().default("https://atlas-protocol-frontend-9xuga44dd-gideon-njunges-projects.vercel.app,https://atlas-protocol-zu2f.onrender.com"),
+  CORS_ORIGINS: z.string().default("https://atlas-protocol-frontend.vercel.app"),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   HELIUS_WEBHOOK_SECRET: z.string().optional(),
   HELIUS_WEBHOOK_SIGNATURE_HEADER: z.string().default("x-webhook-signature"),

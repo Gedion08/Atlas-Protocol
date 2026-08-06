@@ -26,11 +26,16 @@ export async function registerTokenRoutes(app: FastifyInstance, repos: Repositor
   app.get(
     "/api/v1/token/balance/:owner",
     { schema: { tags: ["token"] } },
-    async (request) => {
-      const { owner } = request.params as { owner: string };
-      const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
-      const balance = await getAtlasBalance(connection, new PublicKey(owner));
-      return { data: { owner, mint: "7roukPrgB6rjLrJ9mqHoiCrMTjwYzT8UKbxGgtTRVtEa", balance } };
+    async (request, reply) => {
+      try {
+        const { owner } = request.params as { owner: string };
+        const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
+        const balance = await getAtlasBalance(connection, new PublicKey(owner));
+        return { data: { owner, mint: "7roukPrgB6rjLrJ9mqHoiCrMTjwYzT8UKbxGgtTRVtEa", balance } };
+      } catch (error) {
+        app.log.error({ error }, "failed to fetch token balance");
+        return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
+      }
     },
   );
 
@@ -57,53 +62,63 @@ export async function registerTokenRoutes(app: FastifyInstance, repos: Repositor
     "/api/v1/token/faucet",
     { schema: { tags: ["token"] } },
     async (request, reply) => {
-      const body = faucetBody.parse(request.body);
-      const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
-      const recipient = new PublicKey(body.recipient);
+      try {
+        const body = faucetBody.parse(request.body);
+        const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
+        const recipient = new PublicKey(body.recipient);
 
-      const signature = await sendFaucetTransaction({
-        connection,
-        recipient,
-        amount: body.amount,
-      });
+        const signature = await sendFaucetTransaction({
+          connection,
+          recipient,
+          amount: body.amount,
+        });
 
-      const result: FaucetResult = {
-        signature,
-        recipient: body.recipient,
-        amount: body.amount,
-      };
+        const result: FaucetResult = {
+          signature,
+          recipient: body.recipient,
+          amount: body.amount,
+        };
 
-      return reply.status(200).send({ data: result });
+        return reply.status(200).send({ data: result });
+      } catch (error) {
+        app.log.error({ error }, "failed to send faucet transaction");
+        return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
+      }
     },
   );
 
   app.post(
     "/api/v1/token/sale/build",
     { schema: { tags: ["token"] } },
-    async (request) => {
-      const body = saleBuildBody.parse(request.body);
-      const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
-      const buyer = new PublicKey(body.buyer);
-      const atlasAmount = Math.floor(body.solAmount * env.ATLAS_SALE_RATE);
+    async (request, reply) => {
+      try {
+        const body = saleBuildBody.parse(request.body);
+        const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
+        const buyer = new PublicKey(body.buyer);
+        const atlasAmount = Math.floor(body.solAmount * env.ATLAS_SALE_RATE);
 
-      const { transaction, ataAccounts } = await buildSaleTransaction({
-        connection,
-        buyer,
-        solAmount: body.solAmount,
-        atlasAmount,
-      });
+        const { transaction, ataAccounts } = await buildSaleTransaction({
+          connection,
+          buyer,
+          solAmount: body.solAmount,
+          atlasAmount,
+        });
 
-      const result: SaleBuildResult = {
-        transaction: Buffer.from(transaction.serialize({ requireAllSignatures: false })).toString("base64"),
-        blockhash: transaction.recentBlockhash ?? (await connection.getLatestBlockhash()).blockhash,
-        treasury: getTreasuryPubkey().toBase58(),
-        recipient: body.buyer,
-        solAmount: body.solAmount,
-        atlasAmount,
-        ataAccounts: ataAccounts.map((ata) => ata.toBase58()),
-      };
+        const result: SaleBuildResult = {
+          transaction: Buffer.from(transaction.serialize({ requireAllSignatures: false })).toString("base64"),
+          blockhash: transaction.recentBlockhash ?? (await connection.getLatestBlockhash()).blockhash,
+          treasury: getTreasuryPubkey().toBase58(),
+          recipient: body.buyer,
+          solAmount: body.solAmount,
+          atlasAmount,
+          ataAccounts: ataAccounts.map((ata) => ata.toBase58()),
+        };
 
-      return { data: result };
+        return { data: result };
+      } catch (error) {
+        app.log.error({ error }, "failed to build sale transaction");
+        return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
+      }
     },
   );
 }

@@ -100,9 +100,58 @@ export class MetricsAggregator {
         protocolsUsed: bucket.protocols.size,
         poolsTraded: bucket.pools.size,
         governanceActions: bucket.governanceActions,
+        poolConcentration: 0,
+        tokenConcentration: 0,
+        protocolConcentration: 0,
+        memecoinConcentration: 0,
+        stablePoolConcentration: 0,
+        slippage: 0,
+        feeDecay: 0,
+        oracleHealth: 0,
+        utilization: 0,
+        inventoryImbalance: 0,
       });
     }
     this.buckets.clear();
+    if (points.length > 0) {
+      await this.store.appendMetrics(points);
+    }
+    return points;
+  }
+
+  async flushCompletedBuckets(now = Date.now()): Promise<ManagerMetricsPoint[]> {
+    const points: ManagerMetricsPoint[] = [];
+    const currentDayStart = Math.floor(now / 86_400_000) * 86_400_000;
+    for (const [key, bucket] of this.buckets) {
+      const [managerId, day] = key.split(":");
+      if (Number(day) < currentDayStart) {
+        const navGrowth = bucket.lastTvl > 0 && bucket.pnlEvents > 0 ? bucket.pnl / bucket.lastTvl : 0;
+        points.push({
+          managerId,
+          timestamp: Number(day),
+          tvl: Math.max(0, bucket.lastTvl),
+          nav: 1 + clamp(navGrowth, -0.5, 2),
+          feesGenerated: bucket.fees,
+          dailyPnl: bucket.pnl,
+          maxDrawdown: 0,
+          volatility: 0,
+          protocolsUsed: bucket.protocols.size,
+          poolsTraded: bucket.pools.size,
+          governanceActions: bucket.governanceActions,
+          poolConcentration: 0,
+          tokenConcentration: 0,
+          protocolConcentration: 0,
+          memecoinConcentration: 0,
+          stablePoolConcentration: 0,
+          slippage: 0,
+          feeDecay: 0,
+          oracleHealth: 0,
+          utilization: 0,
+          inventoryImbalance: 0,
+        });
+        this.buckets.delete(key);
+      }
+    }
     if (points.length > 0) {
       await this.store.appendMetrics(points);
     }

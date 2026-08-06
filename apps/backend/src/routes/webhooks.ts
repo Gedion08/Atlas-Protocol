@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Env } from "../env.js";
+import type { Repositories } from "../db/repositories.js";
 import { ApiError } from "../plugins/errors.js";
 import { eventBus } from "../event-bus.js";
 import {
@@ -8,7 +9,11 @@ import {
   type HeliusTransaction,
 } from "../services/indexer/helius.js";
 
-export async function registerWebhookRoutes(app: FastifyInstance, env: Env): Promise<void> {
+export async function registerWebhookRoutes(
+  app: FastifyInstance,
+  env: Env,
+  repos: Repositories,
+): Promise<void> {
   app.post(
     "/webhooks/helius",
     {
@@ -38,7 +43,26 @@ export async function registerWebhookRoutes(app: FastifyInstance, env: Env): Pro
       const events = normalizeHeliusWebhook(
         request.body as { transactions?: HeliusTransaction[] },
       );
+
+      const vaults = await repos.vaults.list();
+      const vaultByAddress = new Map(vaults.map((v) => [v.address, v]));
+      const strategies = await repos.strategies.list();
+      const strategyByVault = new Map(strategies.map((s) => [s.pool, s]));
+
       for (const event of events) {
+        if (!event.managerId && event.vaultAddress) {
+          const vault = vaultByAddress.get(event.vaultAddress);
+          if (vault) {
+            event.managerId = vault.managerId;
+            const strategy = strategies.find((s) => s.managerId === vault.managerId);
+            if (strategy) {
+              event.payload.pool = strategy.pool;
+              event.payload.protocol = strategy.protocol;
+              event.payload.pair = strategy.pair;
+              event.strategyId = strategy.id;
+            }
+          }
+        }
         await eventBus.publish(event);
       }
 

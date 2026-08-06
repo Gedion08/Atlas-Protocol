@@ -71,9 +71,9 @@ describe("MetricsAggregator", () => {
 describe("oracle scoring", () => {
   it("derives score inputs from real metric series", () => {
     const points = [
-      { managerId: "m1", timestamp: now - 2 * DAY, tvl: 1_000_000, nav: 1, feesGenerated: 5000, dailyPnl: 10_000, maxDrawdown: 0.05, volatility: 0.08, protocolsUsed: 3, poolsTraded: 5, governanceActions: 2 },
-      { managerId: "m1", timestamp: now - DAY, tvl: 1_100_000, nav: 1.05, feesGenerated: 0, dailyPnl: 15_000, maxDrawdown: 0.05, volatility: 0.08, protocolsUsed: 3, poolsTraded: 6, governanceActions: 0 },
-      { managerId: "m1", timestamp: now, tvl: 1_200_000, nav: 1.1, feesGenerated: 0, dailyPnl: 12_000, maxDrawdown: 0.05, volatility: 0.08, protocolsUsed: 3, poolsTraded: 6, governanceActions: 1 },
+      { managerId: "m1", timestamp: now - 2 * DAY, tvl: 1_000_000, nav: 1, feesGenerated: 5000, dailyPnl: 10_000, maxDrawdown: 0.05, volatility: 0.08, protocolsUsed: 3, poolsTraded: 5, governanceActions: 2, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
+      { managerId: "m1", timestamp: now - DAY, tvl: 1_100_000, nav: 1.05, feesGenerated: 0, dailyPnl: 15_000, maxDrawdown: 0.05, volatility: 0.08, protocolsUsed: 3, poolsTraded: 6, governanceActions: 0, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
+      { managerId: "m1", timestamp: now, tvl: 1_200_000, nav: 1.1, feesGenerated: 0, dailyPnl: 12_000, maxDrawdown: 0.05, volatility: 0.08, protocolsUsed: 3, poolsTraded: 6, governanceActions: 1, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
     ];
 
     const inputs = computeScoreInputs(points);
@@ -99,8 +99,8 @@ describe("oracle scoring", () => {
   it("runs a loop tick over managers in the store", async () => {
     const store = new InMemoryTimeSeriesStore();
     await store.appendMetrics([
-      { managerId: "m1", timestamp: now - DAY, tvl: 1_000_000, nav: 1, feesGenerated: 100, dailyPnl: 100, maxDrawdown: 0.1, volatility: 0.2, protocolsUsed: 2, poolsTraded: 3, governanceActions: 0 },
-      { managerId: "m1", timestamp: now, tvl: 1_010_000, nav: 1.01, feesGenerated: 0, dailyPnl: 100, maxDrawdown: 0.1, volatility: 0.2, protocolsUsed: 2, poolsTraded: 3, governanceActions: 0 },
+      { managerId: "m1", timestamp: now - DAY, tvl: 1_000_000, nav: 1, feesGenerated: 100, dailyPnl: 100, maxDrawdown: 0.1, volatility: 0.2, protocolsUsed: 2, poolsTraded: 3, governanceActions: 0, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
+      { managerId: "m1", timestamp: now, tvl: 1_010_000, nav: 1.01, feesGenerated: 0, dailyPnl: 100, maxDrawdown: 0.1, volatility: 0.2, protocolsUsed: 2, poolsTraded: 3, governanceActions: 0, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
     ]);
 
     const submissions = new InMemoryOracleSubmissionStore();

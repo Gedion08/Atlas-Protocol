@@ -7,13 +7,15 @@ import {
   TransactionInstruction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import type { ManagerProfile } from "atlas-types";
+import type { ManagerProfile, Strategy, Vault } from "atlas-types";
 import { evaluateRiskRules, type RiskDecision } from "../risk-engine/index.js";
+import { computeConcentrationMetrics } from "../risk-engine/concentrations.js";
 import {
   REGISTRY_PROGRAM_ID,
   managerProfilePda,
   registryConfigPda,
 } from "../oracle/solana.js";
+import { VAULT_PROGRAM_ID } from "../vault/solana.js";
 import { withRetry } from "../../utils/retry.js";
 
 /** Anchor discriminator for the registry `set_status` instruction. */
@@ -64,6 +66,11 @@ export function buildSetStatusInstruction(args: {
 export interface CircuitBreakerSubmitter {
   /** Suspends a manager on-chain; must not throw (loop continues on error). */
   suspend(manager: ManagerProfile): Promise<void>;
+}
+
+export interface VaultEmergencyExitSubmitter {
+  /** Triggers emergency exit on a vault; must not throw. */
+  emergencyExit(vault: Vault): Promise<void>;
 }
 
 export interface CircuitBreakerSubmitterOptions {
@@ -138,6 +145,64 @@ export class DryRunCircuitBreakerSubmitter implements CircuitBreakerSubmitter {
   }
 }
 
+export interface VaultEmergencyExitSubmitterOptions {
+  connection: Connection;
+  signerKeypair: Keypair;
+  programId?: PublicKey;
+  onError?: (err: unknown) => void;
+  send?: typeof sendAndConfirmTransaction;
+}
+
+/** Sends `emergency_exit` for an on-chain vault via the governance keypair. */
+export class SolanaVaultEmergencyExitSubmitter implements VaultEmergencyExitSubmitter {
+  private readonly programId: PublicKey;
+  private readonly onError: (err: unknown) => void;
+  private readonly sent = new Set<string>();
+  readonly signatures: string[] = [];
+
+  constructor(private readonly options: VaultEmergencyExitSubmitterOptions) {
+    this.programId = options.programId ?? VAULT_PROGRAM_ID;
+    this.onError = options.onError ?? ((err) => console.error("vault emergency exit error", err));
+  }
+
+  async emergencyExit(vault: Vault): Promise<void> {
+    if (!vault.onchain || this.sent.has(vault.address)) return;
+    try {
+      const { buildEmergencyExitTransaction } = await import("../vault/solana.js");
+      const tx = await buildEmergencyExitTransaction({
+        connection: this.options.connection,
+        programId: this.programId,
+        meta: vault.onchain,
+        authority: this.options.signerKeypair.publicKey,
+      });
+      const send = this.options.send ?? sendAndConfirmTransaction;
+      const signature = await withRetry(
+        () =>
+          send(
+            this.options.connection,
+            tx.transaction,
+            [this.options.signerKeypair],
+            { commitment: "confirmed" },
+          ),
+        { attempts: 3, baseDelayMs: 500, maxDelayMs: 4000 },
+      );
+      this.sent.add(vault.address);
+      this.signatures.push(signature);
+    } catch (err) {
+      this.onError(err);
+    }
+  }
+}
+
+/** No-op vault submitter for dry-run / test environments. */
+export class DryRunVaultEmergencyExitSubmitter implements VaultEmergencyExitSubmitter {
+  readonly exited: string[] = [];
+
+  async emergencyExit(vault: Vault): Promise<void> {
+    this.exited.push(vault.address);
+  }
+}
+
 export interface CircuitBreakerLoopOptions {
   store: {
     metricsFor(managerId: string, from: number, to: number): Promise<
@@ -147,7 +212,17 @@ export interface CircuitBreakerLoopOptions {
   managers: {
     list(): Promise<ManagerProfile[]>;
   };
+  vaults: {
+    list(): Promise<Vault[]>;
+  };
+  strategies: {
+    list(filter?: { managerId?: string }): Promise<Strategy[]>;
+  };
   submitter: CircuitBreakerSubmitter;
+  vaultSubmitter?: VaultEmergencyExitSubmitter;
+  dlmm?: {
+    latestForStrategy(strategyId: string): Promise<{ inventorySkew: number } | null>;
+  };
   /** Lookback window for the risk evaluation, ms. */
   lookbackMs?: number;
   intervalMs?: number;
@@ -229,6 +304,21 @@ export class CircuitBreakerLoop {
       if (nav < peak) maxDrawdown = Math.max(maxDrawdown, (peak - nav) / peak);
     }
 
+    const concentrations = await computeConcentrationMetrics(manager.id, this.options.vaults, this.options.strategies);
+
+    let inventoryImbalance = 0.05;
+    if (this.options.dlmm) {
+      const dlmmStrategies = await this.options.strategies.list({ managerId: manager.id });
+      for (const s of dlmmStrategies) {
+        if (s.protocol !== "meteora") continue;
+        const latest = await this.options.dlmm.latestForStrategy(s.id);
+        if (latest) {
+          inventoryImbalance = latest.inventorySkew;
+          break;
+        }
+      }
+    }
+
     const decision = evaluateRiskRules({
       var95,
       var99,
@@ -238,21 +328,31 @@ export class CircuitBreakerLoop {
       maxDrawdown: Math.max(maxDrawdown, points[points.length - 1].maxDrawdown),
       dailyPnl: points[points.length - 1].dailyPnl,
       weeklyPnl: points.slice(-7).reduce((acc, p) => acc + p.dailyPnl, 0),
-      poolConcentration: 0.22,
-      tokenConcentration: 0.15,
-      protocolConcentration: 0.35,
-      memecoinConcentration: 0.02,
-      stablePoolConcentration: 0.1,
+      poolConcentration: concentrations.poolConcentration,
+      tokenConcentration: concentrations.tokenConcentration,
+      protocolConcentration: concentrations.protocolConcentration,
+      memecoinConcentration: concentrations.memecoinConcentration,
+      stablePoolConcentration: concentrations.stablePoolConcentration,
       slippage: 0.004,
       feeDecay: 0.02,
       oracleHealth: 1,
       utilization: 0.8,
-      inventoryImbalance: 0.05,
+      inventoryImbalance,
     });
     this.decisions.push(decision);
 
     if (decision.action === "pause") {
       await this.options.submitter.suspend(manager);
+      if (this.options.vaultSubmitter) {
+        const managerVaults = await this.options.vaults.list();
+        for (const vault of managerVaults) {
+          if (vault.managerId === manager.id) {
+            void this.options.vaultSubmitter.emergencyExit(vault).catch((err) =>
+              console.error("vault emergency exit failed", vault.address, err),
+            );
+          }
+        }
+      }
     }
   }
 }

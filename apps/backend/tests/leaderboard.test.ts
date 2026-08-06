@@ -22,9 +22,9 @@ describe("leaderboard from real data", () => {
   it("derives performance series from ingested metrics", async () => {
     const store = new InMemoryTimeSeriesStore();
     await store.appendMetrics([
-      { managerId: "mgr_quantum", timestamp: now - 2 * DAY, tvl: 10_000_000, nav: 1, feesGenerated: 1000, dailyPnl: 5000, maxDrawdown: 0.05, volatility: 0.1, protocolsUsed: 4, poolsTraded: 14, governanceActions: 1 },
-      { managerId: "mgr_quantum", timestamp: now - DAY, tvl: 11_000_000, nav: 1.05, feesGenerated: 0, dailyPnl: 6000, maxDrawdown: 0.05, volatility: 0.1, protocolsUsed: 4, poolsTraded: 14, governanceActions: 0 },
-      { managerId: "mgr_quantum", timestamp: now, tvl: 12_000_000, nav: 1.1, feesGenerated: 0, dailyPnl: 7000, maxDrawdown: 0.05, volatility: 0.1, protocolsUsed: 4, poolsTraded: 14, governanceActions: 0 },
+      { managerId: "mgr_quantum", timestamp: now - 2 * DAY, tvl: 10_000_000, nav: 1, feesGenerated: 1000, dailyPnl: 5000, maxDrawdown: 0.05, volatility: 0.1, protocolsUsed: 4, poolsTraded: 14, governanceActions: 1, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
+      { managerId: "mgr_quantum", timestamp: now - DAY, tvl: 11_000_000, nav: 1.05, feesGenerated: 0, dailyPnl: 6000, maxDrawdown: 0.05, volatility: 0.1, protocolsUsed: 4, poolsTraded: 14, governanceActions: 0, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
+      { managerId: "mgr_quantum", timestamp: now, tvl: 12_000_000, nav: 1.1, feesGenerated: 0, dailyPnl: 7000, maxDrawdown: 0.05, volatility: 0.1, protocolsUsed: 4, poolsTraded: 14, governanceActions: 0, poolConcentration: 0, tokenConcentration: 0, protocolConcentration: 0, memecoinConcentration: 0, stablePoolConcentration: 0, slippage: 0, feeDecay: 0, oracleHealth: 0, utilization: 0, inventoryImbalance: 0 },
     ]);
 
     const repos = createMemoryRepositories(store);

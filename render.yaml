@@ -1,0 +1,33 @@
+services:
+  - type: postgres
+    name: atlas-protocol-db
+    databaseName: atlas
+    user: atlas
+    password: "${POSTGRES_PASSWORD}"
+
+  - type: web
+    name: atlas-protocol-backend
+    runtime: docker
+    port: 10000
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REPOSITORY_DRIVER
+        value: postgres
+      - key: DB_AUTO_MIGRATE
+        value: "true"
+      - key: DB_AUTO_SEED
+        value: "false"
+      - key: CORS_ORIGINS
+        value: https://atlas-protocol-frontend-9xuga44dd-gideon-njunges-projects.vercel.app
+      - key: DATABASE_URL
+        fromService:
+          type: postgres
+          name: atlas-protocol-db
+          property: connectionString
+      - key: PORT
+        value: 10000
+      - key: BACKEND_PORT
+        value: 10000
+    deploy:
+      numInstances: 1

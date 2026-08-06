@@ -1,5 +1,6 @@
 pub mod config;
 pub mod deposit;
+pub mod emergency_exit;
 pub mod fees;
 pub mod initialize;
 pub mod rebalance;
@@ -9,6 +10,7 @@ pub mod withdraw;
 
 pub use config::*;
 pub use deposit::*;
+pub use emergency_exit::*;
 pub use fees::*;
 pub use initialize::*;
 pub use rebalance::*;

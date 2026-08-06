@@ -62,4 +62,8 @@ pub mod atlas_treasury {
     pub fn rollover_period(ctx: Context<RolloverPeriod>) -> Result<()> {
         rollover_period_handler(ctx)
     }
+
+    pub fn activate_insurance(ctx: Context<ActivateInsurance>, amount: u64) -> Result<()> {
+        activate_insurance_handler(ctx, amount)
+    }
 }

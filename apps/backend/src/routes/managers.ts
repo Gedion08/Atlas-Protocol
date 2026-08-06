@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Repositories } from "../db/repositories.js";
 import { computeManagerScore } from "../services/scoring/index.js";
 import { evaluateRiskRules } from "../services/risk-engine/index.js";
+import { computeConcentrationMetrics } from "../services/risk-engine/concentrations.js";
 import type { RiskMetrics } from "atlas-types";
 
 const managerParam = z.object({ id: z.string().min(1) });
@@ -59,6 +60,8 @@ export async function registerManagerRoutes(
       const manager = await repos.managers.get(id);
       if (!manager) return reply.status(404).send({ error: "manager_not_found", message: "Manager not found", statusCode: 404 });
 
+      const concentrations = await computeConcentrationMetrics(id, repos.vaults, repos.strategies);
+
       const metrics: RiskMetrics = {
         var95: 0.035,
         var99: 0.06,
@@ -68,11 +71,11 @@ export async function registerManagerRoutes(
         maxDrawdown: manager.maxDrawdown,
         dailyPnl: manager.maxDrawdown / 30,
         weeklyPnl: manager.maxDrawdown / 4,
-        poolConcentration: 0.22,
-        tokenConcentration: 0.15,
-        protocolConcentration: 0.35,
-        memecoinConcentration: 0.02,
-        stablePoolConcentration: 0.1,
+        poolConcentration: concentrations.poolConcentration,
+        tokenConcentration: concentrations.tokenConcentration,
+        protocolConcentration: concentrations.protocolConcentration,
+        memecoinConcentration: concentrations.memecoinConcentration,
+        stablePoolConcentration: concentrations.stablePoolConcentration,
         slippage: 0.004,
         feeDecay: 0.02,
         oracleHealth: 1,

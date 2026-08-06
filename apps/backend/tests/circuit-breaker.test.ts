@@ -9,9 +9,55 @@ import {
   buildSetStatusInstruction,
 } from "../src/services/circuit-breaker/index.js";
 import { managerProfilePda, registryConfigPda } from "../src/services/oracle/solana.js";
-import type { ManagerProfile } from "atlas-types";
+import type { ManagerProfile, Strategy, Vault } from "atlas-types";
 
 const PROGRAM_ID = new PublicKey("9h29CPwoYFgQ4wYN2oWWCyA9rS3nMYaeS99Y676zSGa8");
+
+function vault(overrides: Partial<Vault> = {}): Vault {
+  return {
+    address: "VaU1tXYb7mX8G5w3eRkQzKj4nLpDcVfBqHtSwXcYaZx",
+    name: "Atlas Core",
+    baseAsset: "USDC",
+    managerId: "mgr_quantum",
+    authority: "AtL45sAu2DvBqPj9nRyGcE7fHwMzNxQkTpSrLvJmWcYa",
+    status: "active",
+    tvl: 10_000_000,
+    apy: 15,
+    sharesOutstanding: 9_000_000,
+    managementFeeBps: 50,
+    performanceFeeBps: 2000,
+    minDeposit: 100,
+    allocation: null,
+    createdAt: Date.now(),
+    lastRebalanceAt: Date.now(),
+    ...overrides,
+  };
+}
+
+function strategy(overrides: Partial<Strategy> = {}): Strategy {
+  return {
+    id: "str_1",
+    managerId: "mgr_quantum",
+    name: "Strategy 1",
+    type: "passive",
+    protocol: "meteora",
+    pool: "SOL-USDC",
+    pair: "SOL/USDC",
+    tvl: 5_000_000,
+    apy: 15,
+    apr: 15,
+    maxDrawdown: 0.05,
+    sharpeRatio: 1.5,
+    sortinoRatio: 2,
+    fees: { managementBps: 50, performanceBps: 1500 },
+    impermanentLoss: 0.01,
+    utilization: 0.8,
+    ageDays: 100,
+    version: 1,
+    riskTier: 1,
+    ...overrides,
+  };
+}
 
 function profile(overrides: Partial<ManagerProfile> = {}): ManagerProfile {
   return {
@@ -59,6 +105,22 @@ function makePoint(managerId: string, index: number, nav: number, dailyPnl = 0) 
     governanceActions: 0,
   };
 }
+
+function mockRepos(manager: ManagerProfile, vaults: Vault[], strategies: Strategy[]) {
+  return {
+    managers: { list: vi.fn().mockResolvedValue([manager]) },
+    vaults: { list: vi.fn().mockResolvedValue(vaults) },
+    strategies: { list: vi.fn().mockResolvedValue(strategies) },
+  };
+}
+
+const diversifiedStrategies = [
+  strategy({ pool: "AAA-BBB", pair: "AAA/BBB", protocol: "meteora", tvl: 2_000_000 }),
+  strategy({ pool: "CCC-DDD", pair: "CCC/DDD", protocol: "orca", tvl: 2_000_000 }),
+  strategy({ pool: "EEE-FFF", pair: "EEE/FFF", protocol: "raydium", tvl: 2_000_000 }),
+  strategy({ pool: "GGG-HHH", pair: "GGG/HHH", protocol: "kamino", tvl: 2_000_000 }),
+  strategy({ pool: "III-JJJ", pair: "III/JJJ", protocol: "jupiter", tvl: 2_000_000 }),
+];
 
 describe("buildSetStatusInstruction", () => {
   it("encodes the set_status discriminator and the status tag", () => {
@@ -146,7 +208,7 @@ describe("CircuitBreakerLoop", () => {
     const submitter = new DryRunCircuitBreakerSubmitter();
     const loop = new CircuitBreakerLoop({
       store: { metricsFor: vi.fn().mockResolvedValue(points) },
-      managers: { list: vi.fn().mockResolvedValue([manager]) },
+      ...mockRepos(manager, [vault()], diversifiedStrategies),
       submitter,
       intervalMs: 10_000,
     });
@@ -163,7 +225,7 @@ describe("CircuitBreakerLoop", () => {
     const submitter = new DryRunCircuitBreakerSubmitter();
     const loop = new CircuitBreakerLoop({
       store: { metricsFor: vi.fn().mockResolvedValue(points) },
-      managers: { list: vi.fn().mockResolvedValue([manager]) },
+      ...mockRepos(manager, [vault()], diversifiedStrategies),
       submitter,
     });
     await loop.runOnce();
@@ -175,7 +237,7 @@ describe("CircuitBreakerLoop", () => {
     const submitter = new DryRunCircuitBreakerSubmitter();
     const loop = new CircuitBreakerLoop({
       store: { metricsFor: vi.fn().mockResolvedValue([makePoint(manager.id, 0, 100)]) },
-      managers: { list: vi.fn().mockResolvedValue([manager]) },
+      ...mockRepos(manager, [vault()], diversifiedStrategies),
       submitter,
     });
     await loop.runOnce();
@@ -196,6 +258,8 @@ describe("CircuitBreakerLoop", () => {
           ),
       },
       managers: { list: vi.fn().mockResolvedValue(managers) },
+      vaults: { list: vi.fn().mockResolvedValue([vault(), vault({ managerId: "mgr_apex" })]) },
+      strategies: { list: vi.fn().mockResolvedValue(diversifiedStrategies.map(s => ({ ...s, managerId: "mgr_apex" }))) },
       submitter,
     });
     await loop.runOnce();
@@ -206,6 +270,8 @@ describe("CircuitBreakerLoop", () => {
     const loop = new CircuitBreakerLoop({
       store: { metricsFor: vi.fn().mockResolvedValue([]) },
       managers: { list: vi.fn().mockResolvedValue([]) },
+      vaults: { list: vi.fn().mockResolvedValue([]) },
+      strategies: { list: vi.fn().mockResolvedValue([]) },
       submitter: new DryRunCircuitBreakerSubmitter(),
       intervalMs: 5_000,
     });

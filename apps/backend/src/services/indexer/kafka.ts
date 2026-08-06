@@ -99,6 +99,16 @@ export class Indexer {
       protocolsUsed: 0,
       poolsTraded: 0,
       governanceActions: 0,
+      poolConcentration: 0,
+      tokenConcentration: 0,
+      protocolConcentration: 0,
+      memecoinConcentration: 0,
+      stablePoolConcentration: 0,
+      slippage: 0,
+      feeDecay: 0,
+      oracleHealth: 0,
+      utilization: 0,
+      inventoryImbalance: 0,
     };
   }
 }

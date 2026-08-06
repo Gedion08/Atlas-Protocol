@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Repositories } from "../db/repositories.js";
 import { riskTierFromScore } from "../services/scoring/index.js";
 import { NonceStore, requireWalletSignature } from "../services/auth/signature.js";
+import { validateStrategyParams } from "atlas-types";
 
 const strategyQuery = z.object({
   managerId: z.string().optional(),
@@ -127,7 +128,21 @@ export async function registerStrategyRoutes(
         });
       }
 
-      const strategy = await repos.strategies.create(upload);
+      // Strategy SDK validation (roadmap §Phase 3): validate params against the
+      // per-strategy-type schema; normalize defaults and reject unknown fields.
+      const validation = validateStrategyParams(upload.type, upload.params);
+      if (!validation.ok) {
+        return reply.status(400).send({
+          error: "invalid_strategy_params",
+          message: validation.errors.join("; "),
+          statusCode: 400,
+        });
+      }
+
+      const strategy = await repos.strategies.create({
+        ...upload,
+        params: validation.normalized,
+      });
       return reply.status(201).send({ data: strategy });
     },
   );

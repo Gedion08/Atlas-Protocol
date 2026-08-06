@@ -31,7 +31,7 @@ describe("investor positions", () => {
 
   beforeAll(async () => {
     app = await buildApp({
-      env: loadEnv({ NODE_ENV: "test", LOG_LEVEL: "silent", REPOSITORY_DRIVER: "memory" }),
+      env: loadEnv({ NODE_ENV: "test", LOG_LEVEL: "silent", REPOSITORY_DRIVER: "memory", KAFKA_ENABLED: "false", ORACLE_LOOP_ENABLED: "false", CIRCUIT_BREAKER_ENABLED: "false" }),
       repositories: createMemoryRepositories(),
       logger: false,
     });

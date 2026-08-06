@@ -10,6 +10,7 @@ export interface HeliusTransaction {
   description?: string;
   nativeTransfers?: Array<{ amount: number }>;
   events?: Record<string, unknown>;
+  accountData?: Array<{ account: string }>;
 }
 
 export type AtlasEventType =
@@ -83,17 +84,32 @@ export async function getRawBody(request: FastifyRequest): Promise<Buffer> {
 export function normalizeHeliusWebhook(body: {
   transactions?: HeliusTransaction[];
 }): AtlasEvent[] {
-  return (body.transactions ?? []).map((tx) => ({
-    type: (tx.type as AtlasEventType) ?? "swap",
-    signature: tx.signature,
-    timestamp: tx.timestamp,
-    slot: tx.slot,
-    vaultAddress: "",
-    managerId: "",
-    payload: {
-      description: tx.description,
-      events: tx.events,
-      nativeTransfers: tx.nativeTransfers,
-    },
-  }));
+  return (body.transactions ?? []).map((tx) => {
+    let vaultAddress = "";
+    if (tx.accountData) {
+      for (const acc of tx.accountData) {
+        if (acc.account) {
+          vaultAddress = acc.account;
+          break;
+        }
+      }
+    }
+    if (!vaultAddress && tx.description) {
+      const match = tx.description.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/);
+      if (match) vaultAddress = match[0];
+    }
+    return {
+      type: (tx.type as AtlasEventType) ?? "swap",
+      signature: tx.signature,
+      timestamp: tx.timestamp,
+      slot: tx.slot,
+      vaultAddress,
+      managerId: "",
+      payload: {
+        description: tx.description,
+        events: tx.events,
+        nativeTransfers: tx.nativeTransfers,
+      },
+    };
+  });
 }

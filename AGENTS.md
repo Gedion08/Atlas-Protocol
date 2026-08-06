@@ -5,7 +5,7 @@ Atlas Protocol: Solana (Anchor) programs + Fastify backend + Next.js frontend, a
 ## Layout
 
 - `programs/` — Rust workspace (`vault`, `manager-registry`, `staking`, `governance`, `treasury`). README says 3 programs; the Cargo workspace actually has 5 members.
-- `apps/backend/` — Fastify API. Services: `src/services/{scoring,risk-engine,allocation,indexer,ingestion,oracle,governance,perf-metrics,analytics,pricing,circuit-breaker}`.
+- `apps/backend/` — Fastify API. Services: `src/services/{scoring,risk-engine,allocation,indexer,ingestion,oracle,governance,perf-metrics,analytics,pricing,circuit-breaker}`. Routes: `src/routes/{health,vaults,managers,strategies,leaderboard,investors,oracle,governance,governance-execution,staking,webhooks,ws}`.
 - `apps/frontend/` — Next.js 15 + Tailwind 4 + TanStack Query.
 - `packages/types/` — shared TS types (`atlas-types`). Only workspace package consumed by both apps.
 - `packages/sdk/` — `atlas-sdk`: typed client over the backend API (vaults, strategies, uploads, leaderboard, risk). Build order: `atlas-types` first, then `atlas-sdk`.
@@ -34,7 +34,7 @@ CI (`.github/workflows/ci.yml`) is the source of truth for what must pass: front
 
 ## Gotchas
 
-- **`anchor build` / `anchor test` do not work** — no `Anchor.toml` is committed. Program `tests/*.ts` (Anchor TS) are currently unrunnable; verify Rust changes with `cargo test`/`cargo clippy` as CI does.
+- **`anchor build` / `anchor test`** — `programs/Anchor.toml` is committed. Program `tests/*.ts` (Anchor TS) are currently unrunnable because `target/types/` is gitignored and not generated; verify Rust changes with `cargo test`/`cargo clippy` as CI does.
 - **Build order matters**: `atlas-types` must be built before backend/frontend `tsc` (typecheck/build). Vitest aliases `atlas-types` to source, so tests work without the build.
 - Backend env is zod-validated at import in `src/env.ts` (`NODE_ENV` must be `development|test|production`); invalid env crashes startup. Default `REPOSITORY_DRIVER=memory`; Postgres driver only in docker-compose.
 - Program changes: never change PDA seeds without a migration plan; add TS instruction tests in `programs/*/tests/`; update `docs/architecture.md` on account layout changes.

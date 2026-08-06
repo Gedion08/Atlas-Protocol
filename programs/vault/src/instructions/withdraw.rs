@@ -130,7 +130,6 @@ pub fn settle_withdraw_handler(ctx: Context<SettleWithdraw>) -> Result<()> {
     let req_settled = ctx.accounts.request.settled;
     let req_slot = ctx.accounts.request.settlement_slot;
     require!(!req_settled, VaultError::AlreadySettled);
-    require!(Clock::get()?.slot >= req_slot, VaultError::NotDue);
 
     let now = Clock::get()?.unix_timestamp;
     let config = &ctx.accounts.config;
@@ -139,6 +138,11 @@ pub fn settle_withdraw_handler(ctx: Context<SettleWithdraw>) -> Result<()> {
 
     let escrow_amount = ctx.accounts.vault_escrow.amount;
     require!(escrow_amount > 0, VaultError::EscrowEmpty);
+
+    // In an emergency shutdown the slot gate is bypassed so investors can
+    // redeem immediately. In normal operation the request must be due.
+    let emergency = vault.status == VaultStatus::Emergency;
+    require!(emergency || Clock::get()?.slot >= req_slot, VaultError::NotDue);
 
     // Settlement at current NAVPS (net of accrued fees), pro-rata against the queued
     // redemption pool and hard-capped by liquid escrow. If the vault is short, each

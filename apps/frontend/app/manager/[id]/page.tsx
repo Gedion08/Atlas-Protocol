@@ -195,7 +195,7 @@ export default function ManagerPage() {
           <h2 className="mb-4 text-xl font-semibold">Vaults</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {managerVaults.map((vault) => {
-              const sharePrice = vault.sharesOutstanding > 0 ? vault.tvl / vault.sharesOutstanding : 1;
+              const sharePrice = vault.sharePrice ?? (vault.sharesOutstanding > 0 ? vault.tvl / vault.sharesOutstanding : 1);
               return (
                 <Card key={vault.address}>
                   <CardContent className="p-5">

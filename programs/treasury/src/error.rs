@@ -28,4 +28,6 @@ pub enum TreasuryError {
     DuplicateOracleSigner,
     #[msg("Accounting period has not yet elapsed")]
     PeriodNotElapsed,
+    #[msg("Revenue escrow lacks liquidity for the requested transfer")]
+    InsufficientLiquidity,
 }

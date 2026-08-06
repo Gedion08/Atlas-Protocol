@@ -13,8 +13,11 @@ import { registerInvestorRoutes } from "./routes/investors.js";
 import { registerOracleRoutes } from "./routes/oracle.js";
 import { registerGovernanceRoutes } from "./routes/governance.js";
 import { registerGovernanceExecutionRoutes } from "./routes/governance-execution.js";
+import { registerInsuranceRoutes } from "./routes/insurance.js";
 import { registerStakingRoutes } from "./routes/staking.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
+import { registerWsRoutes } from "./routes/ws.js";
+import { registerAnalyticsRoutes } from "./routes/analytics.js";
 import { createMemoryRepositories, type Repositories } from "./db/repositories.js";
 import { createPostgresRepositories } from "./db/repositories-pg.js";
 import { buildPgPool } from "./db/bootstrap.js";
@@ -33,8 +36,12 @@ import {
   CircuitBreakerLoop,
   DryRunCircuitBreakerSubmitter,
   SolanaCircuitBreakerSubmitter,
+  DryRunVaultEmergencyExitSubmitter,
+  SolanaVaultEmergencyExitSubmitter,
 } from "./services/circuit-breaker/index.js";
 import { VaultClient } from "./services/vault/index.js";
+import { DlmmEnricher } from "./services/analytics/dlmm-enricher.js";
+import { ClickHouseDlmmAnalyticsStore, type DlmmAnalyticsStore } from "./services/analytics/dlmm.js";
 
 export interface BuildAppOptions {
   env?: Env;
@@ -42,6 +49,7 @@ export interface BuildAppOptions {
   repositories?: Repositories;
   timeSeries?: TimeSeriesStore;
   vaultClient?: VaultClient;
+  dlmmStore?: DlmmAnalyticsStore;
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -73,6 +81,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   const aggregator = new MetricsAggregator(timeSeries);
   eventBus.subscribe((event) => void aggregator.ingest([event]));
+
+  const dlmmStore =
+    options.dlmmStore ??
+    new ClickHouseDlmmAnalyticsStore(env.CLICKHOUSE_URL);
+  const dlmmEnricher = new DlmmEnricher(dlmmStore);
+  eventBus.subscribe((event) => void dlmmEnricher.enrich(event).catch(() => {}));
+
+  const aggregatorFlushTimer = setInterval(
+    () => void aggregator.flushCompletedBuckets().catch(() => {}),
+    3_600_000,
+  );
+  aggregatorFlushTimer.unref();
 
   const vaultClient =
     options.vaultClient ??
@@ -113,7 +133,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     oracleLoop.start();
   }
 
-  let circuitBreaker: CircuitBreakerLoop | null = null;
+   let circuitBreaker: CircuitBreakerLoop | null = null;
   if (env.CIRCUIT_BREAKER_ENABLED) {
     const breakerSubmitter = env.GOVERNANCE_KEYPAIR
       ? new SolanaCircuitBreakerSubmitter({
@@ -124,10 +144,28 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
           programId: new PublicKey(env.ATLAS_REGISTRY_PROGRAM_ID),
         })
       : new DryRunCircuitBreakerSubmitter();
+    const vaultSubmitter = env.GOVERNANCE_KEYPAIR
+      ? new SolanaVaultEmergencyExitSubmitter({
+          connection: new Connection(env.SOLANA_RPC_URL, "confirmed"),
+          signerKeypair: Keypair.fromSecretKey(
+            Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]),
+          ),
+          programId: new PublicKey(env.ATLAS_VAULT_PROGRAM_ID),
+        })
+      : new DryRunVaultEmergencyExitSubmitter();
     circuitBreaker = new CircuitBreakerLoop({
       store: timeSeries,
       managers: repositories.managers,
+      vaults: repositories.vaults,
+      strategies: repositories.strategies,
       submitter: breakerSubmitter,
+      vaultSubmitter,
+      dlmm: {
+        latestForStrategy: async (strategyId: string) => {
+          const result = await dlmmStore.latestForStrategy(strategyId);
+          return result ? { inventorySkew: result.inventorySkew } : null;
+        },
+      },
       intervalMs: env.CIRCUIT_BREAKER_INTERVAL_MS,
     });
     circuitBreaker.start();
@@ -137,6 +175,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await registerMetrics(app);
   registerErrorHandlers(app);
 
+  await app.register(import("@fastify/websocket"));
   await app.register(import("@fastify/swagger"), {
     openapi: {
       info: {
@@ -171,14 +210,19 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     scoped.register(async (r) => registerOracleRoutes(r, repositories));
     scoped.register(async (r) => registerGovernanceRoutes(r, repositories));
     scoped.register(async (r) => registerGovernanceExecutionRoutes(r, repositories));
+    scoped.register(async (r) => registerInsuranceRoutes(r, repositories));
     scoped.register(async (r) => registerStakingRoutes(r, repositories));
-    scoped.register(async (r) => registerWebhookRoutes(r, env));
+    scoped.register(async (r) => registerWebhookRoutes(r, env, repositories));
+    scoped.register(async (r) => registerWsRoutes(r));
+    scoped.register(async (r) => registerAnalyticsRoutes(r, repositories, dlmmStore));
   });
 
   app.addHook("onClose", async () => {
     circuitBreaker?.stop();
     oracleLoop?.stop();
     await indexer?.stop();
+    dlmmEnricher.clearCache();
+    if (aggregatorFlushTimer) clearInterval(aggregatorFlushTimer);
     if (timeSeries !== options.timeSeries) {
       await timeSeries.close();
     }

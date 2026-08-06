@@ -4,6 +4,7 @@ import {
   buildDepositTransaction,
   buildRequestWithdrawTransaction,
   buildSettleWithdrawTransaction,
+  buildEmergencyExitTransaction,
   fetchUserPosition,
   fetchVaultState,
   SHARE_PRICE_SCALE,
@@ -11,7 +12,7 @@ import {
   type BuildTransactionResult,
 } from "./solana.js";
 
-export type InvestAction = "deposit" | "request_withdraw" | "settle_withdraw";
+export type InvestAction = "deposit" | "request_withdraw" | "settle_withdraw" | "emergency_exit";
 
 /**
  * Read-side client over the on-chain atlas-vault program. The backend assembles
@@ -128,6 +129,13 @@ export class VaultClient {
           programId: this.programId,
           meta: args.meta,
           user,
+        });
+      case "emergency_exit":
+        return buildEmergencyExitTransaction({
+          connection: this.connection,
+          programId: this.programId,
+          meta: args.meta,
+          authority: user,
         });
     }
   }

@@ -32,7 +32,7 @@ describe("strategy uploads", () => {
 
   beforeAll(async () => {
     app = await buildApp({
-      env: loadEnv({ NODE_ENV: "test", LOG_LEVEL: "silent", REPOSITORY_DRIVER: "memory" }),
+      env: loadEnv({ NODE_ENV: "test", LOG_LEVEL: "silent", REPOSITORY_DRIVER: "memory", KAFKA_ENABLED: "false", ORACLE_LOOP_ENABLED: "false", CIRCUIT_BREAKER_ENABLED: "false" }),
       repositories: createMemoryRepositories(),
       logger: false,
     });
@@ -53,7 +53,7 @@ describe("strategy uploads", () => {
     fees: { managementBps: 50, performanceBps: 1500 },
     riskTier: 1,
     description: "Concentrated passive range",
-    params: { spreadBps: 30, bins: 40 },
+    params: { rebalanceThresholdBps: 50, spreadBps: 30, bins: 40 },
   };
 
   it("creates a strategy with 201 and defaults", async () => {
@@ -69,7 +69,13 @@ describe("strategy uploads", () => {
     expect(strategy.version).toBe(4);
     expect(strategy.status).toBe("active");
     expect(strategy.tvl).toBe(0);
-    expect(strategy.params).toEqual({ spreadBps: 30, bins: 40 });
+    expect(strategy.params).toEqual({
+      rebalanceThresholdBps: 50,
+      spreadBps: 30,
+      bins: 40,
+      maxSlippageBps: 10,
+      allowedProtocols: [],
+    });
   });
 
   it("bumps the version for a same-named re-upload", async () => {

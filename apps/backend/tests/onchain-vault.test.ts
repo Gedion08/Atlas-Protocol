@@ -135,7 +135,7 @@ describe("on-chain vault routes", () => {
     await repositories.vaults.update({ ...vaults[0], onchain: meta });
 
     app = await buildApp({
-      env: loadEnv({ NODE_ENV: "test", LOG_LEVEL: "silent", REPOSITORY_DRIVER: "memory" }),
+      env: loadEnv({ NODE_ENV: "test", LOG_LEVEL: "silent", REPOSITORY_DRIVER: "memory", KAFKA_ENABLED: "false", ORACLE_LOOP_ENABLED: "false", CIRCUIT_BREAKER_ENABLED: "false" }),
       repositories,
       logger: false,
       vaultClient: new VaultClient(mockConnection(), VAULT_PROGRAM_ID),

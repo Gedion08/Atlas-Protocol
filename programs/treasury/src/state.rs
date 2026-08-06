@@ -31,6 +31,9 @@ pub struct TreasuryConfig {
     /// Revenue withdrawn by governance within the current period (period-capped,
     /// mirrors `period_spent` for buybacks) so repeated calls cannot drain the escrow.
     pub withdraw_spent: u64,
+    /// Insurance escrow PDA: holds revenue earmarked for vault emergency exits
+    /// and investor compensation (spec §6.3).
+    pub insurance_escrow: Pubkey,
     pub bump: u8,
 }
 
@@ -50,6 +53,7 @@ impl TreasuryConfig {
         + 8
         + 8
         + 8
+        + 32
         + 1;
 
     pub fn in_period(&self, now: i64) -> bool {
@@ -138,6 +142,7 @@ mod tests {
             period_start: 1_000,
             period_spent: 42,
             withdraw_spent: 7,
+            insurance_escrow: Pubkey::default(),
             bump: 0,
         };
         assert!(config.in_period(1_000));
@@ -181,6 +186,7 @@ mod tests {
             period_start: 0,
             period_spent: 0,
             withdraw_spent: 0,
+            insurance_escrow: Pubkey::default(),
             bump: 0,
         };
         // 10% premium cap over an intrinsic price of 1000 bps.

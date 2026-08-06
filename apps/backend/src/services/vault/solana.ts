@@ -43,6 +43,8 @@ export const INITIALIZE_CONFIG_DISCRIMINATOR: Uint8Array = discriminator("initia
 export const INITIALIZE_DISCRIMINATOR: Uint8Array = discriminator("initialize");
 /** anchor discriminator for `update_config` */
 export const UPDATE_CONFIG_DISCRIMINATOR: Uint8Array = discriminator("update_config");
+/** anchor discriminator for `emergency_exit` */
+export const EMERGENCY_EXIT_DISCRIMINATOR: Uint8Array = discriminator("emergency_exit");
 
 function encodeU64(value: number | bigint): Buffer {
   const buf = Buffer.alloc(8);
@@ -420,6 +422,29 @@ export function buildUpdateConfigInstruction(args: {
   });
 }
 
+export interface EmergencyExitAccounts {
+  config: PublicKey;
+  vault: PublicKey;
+}
+
+export function buildEmergencyExitInstruction(args: {
+  programId?: PublicKey;
+  accounts: EmergencyExitAccounts;
+  authority: PublicKey;
+}): TransactionInstruction {
+  const programId = args.programId ?? VAULT_PROGRAM_ID;
+  const a = args.accounts;
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: a.config, isSigner: false, isWritable: false },
+      { pubkey: a.vault, isSigner: false, isWritable: true },
+      { pubkey: args.authority, isSigner: true, isWritable: false },
+    ],
+    data: Buffer.from(EMERGENCY_EXIT_DISCRIMINATOR),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Transaction builders (backend assembles; wallet signs + sends)
 // ---------------------------------------------------------------------------
@@ -778,4 +803,29 @@ export async function fetchUserPosition(
     pending,
     claimable,
   };
+}
+
+export async function buildEmergencyExitTransaction(args: {
+  connection: Connection;
+  programId?: PublicKey;
+  meta: OnchainVaultMeta;
+  authority: PublicKey;
+}): Promise<BuildTransactionResult> {
+  const programId = args.programId ?? VAULT_PROGRAM_ID;
+  const meta = args.meta;
+  const [vault] = vaultPda(new PublicKey(meta.authority), new PublicKey(meta.baseMint), programId);
+  const [config] = vaultConfigPda(programId);
+
+  const transaction = new Transaction();
+  transaction.add(
+    buildEmergencyExitInstruction({
+      programId,
+      accounts: { config, vault },
+      authority: args.authority,
+    }),
+  );
+
+  transaction.feePayer = args.authority;
+  transaction.recentBlockhash = (await args.connection.getLatestBlockhash()).blockhash;
+  return { transaction, ataAccounts: [] };
 }

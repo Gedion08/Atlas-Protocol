@@ -16,7 +16,7 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
   ORACLE_LOOP_ENABLED: z
     .string()
-    .default("false")
+    .default("true")
     .transform((v) => v === "true"),
   ORACLE_LOOP_INTERVAL_MS: z.coerce.number().int().positive().default(3_600_000),
   ORACLE_SUSPEND_THRESHOLD: z.coerce.number().int().min(0).max(100).default(40),
@@ -26,7 +26,7 @@ const envSchema = z.object({
   GOVERNANCE_KEYPAIR: z.string().optional(),
   CIRCUIT_BREAKER_ENABLED: z
     .string()
-    .default("false")
+    .default("true")
     .transform((v) => v === "true"),
   CIRCUIT_BREAKER_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   ATLAS_REGISTRY_PROGRAM_ID: z
@@ -43,9 +43,9 @@ const envSchema = z.object({
   KAFKA_BROKERS: z.string().default("localhost:9092"),
   KAFKA_ENABLED: z
     .string()
-    .default("false")
+    .default("true")
     .transform((v) => v === "true"),
-  REPOSITORY_DRIVER: z.enum(["memory", "postgres"]).default("memory"),
+  REPOSITORY_DRIVER: z.enum(["memory", "postgres"]).default("postgres"),
   /** Apply pending SQL migrations at backend startup when using the postgres driver. */
   DB_AUTO_MIGRATE: z
     .string()
@@ -54,9 +54,9 @@ const envSchema = z.object({
   /** Seed demo data on startup only when the database is empty (postgres driver). */
   DB_AUTO_SEED: z
     .string()
-    .default("true")
+    .default("false")
     .transform((v) => v === "true"),
-  CORS_ORIGINS: z.string().default("*"),
+  CORS_ORIGINS: z.string().default("https://atlas-protocol-frontend-9xuga44dd-gideon-njunges-projects.vercel.app,https://atlas-protocol-zu2f.onrender.com"),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   HELIUS_WEBHOOK_SECRET: z.string().optional(),
   HELIUS_WEBHOOK_SIGNATURE_HEADER: z.string().default("x-webhook-signature"),

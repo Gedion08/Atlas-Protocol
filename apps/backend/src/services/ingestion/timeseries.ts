@@ -12,6 +12,16 @@ export interface ManagerMetricsPoint {
   protocolsUsed: number;
   poolsTraded: number;
   governanceActions: number;
+  poolConcentration: number;
+  tokenConcentration: number;
+  protocolConcentration: number;
+  memecoinConcentration: number;
+  stablePoolConcentration: number;
+  slippage: number;
+  feeDecay: number;
+  oracleHealth: number;
+  utilization: number;
+  inventoryImbalance: number;
 }
 
 export interface TimeSeriesStore {
@@ -191,6 +201,16 @@ export class ClickHouseTimeSeriesStore implements TimeSeriesStore {
       protocolsUsed: Number(row.protocols_used),
       poolsTraded: Number(row.pools_traded),
       governanceActions: Number(row.governance_actions),
+      poolConcentration: 0,
+      tokenConcentration: 0,
+      protocolConcentration: 0,
+      memecoinConcentration: 0,
+      stablePoolConcentration: 0,
+      slippage: 0,
+      feeDecay: 0,
+      oracleHealth: 0,
+      utilization: 0,
+      inventoryImbalance: 0,
     }));
   }
 
@@ -229,5 +249,15 @@ function rowToMetricsPoint(row: Record<string, unknown>): ManagerMetricsPoint {
     protocolsUsed: Number(row.protocols_used),
     poolsTraded: Number(row.pools_traded),
     governanceActions: Number(row.governance_actions),
+    poolConcentration: 0,
+    tokenConcentration: 0,
+    protocolConcentration: 0,
+    memecoinConcentration: 0,
+    stablePoolConcentration: 0,
+    slippage: 0,
+    feeDecay: 0,
+    oracleHealth: 0,
+    utilization: 0,
+    inventoryImbalance: 0,
   };
 }

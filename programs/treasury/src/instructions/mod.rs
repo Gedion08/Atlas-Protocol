@@ -21,6 +21,15 @@ pub struct Initialize<'info> {
         bump
     )]
     pub revenue_escrow: Box<Account<'info, TokenAccount>>,
+    #[account(
+        init_if_needed,
+        payer = deployer,
+        token::mint = revenue_mint,
+        token::authority = config,
+        seeds = [b"insurance_escrow", config.key().as_ref()],
+        bump
+    )]
+    pub insurance_escrow: Box<Account<'info, TokenAccount>>,
     pub revenue_mint: Box<Account<'info, Mint>>,
     pub atlas_mint: Box<Account<'info, Mint>>,
     #[account(mut)]
@@ -55,6 +64,7 @@ pub fn initialize_handler(
     config.period_start = Clock::get()?.unix_timestamp;
     config.period_spent = 0;
     config.withdraw_spent = 0;
+    config.insurance_escrow = ctx.accounts.insurance_escrow.key();
     config.bump = ctx.bumps.config;
     Ok(())
 }
@@ -300,6 +310,55 @@ pub fn rollover_period_handler(ctx: Context<RolloverPeriod>) -> Result<()> {
     config.period_start = now;
     config.period_spent = 0;
     config.withdraw_spent = 0;
+    Ok(())
+}
+
+/// Governance-signed activation of the insurance escrow: transfers a fixed amount
+/// from `revenue_escrow` to `insurance_escrow` to cover emergency-exit payouts.
+#[derive(Accounts)]
+pub struct ActivateInsurance<'info> {
+    #[account(
+        mut,
+        seeds = [b"atlas_treasury"],
+        bump = config.bump,
+        constraint = governance.key() == config.governance @ TreasuryError::Unauthorized
+    )]
+    pub config: Account<'info, TreasuryConfig>,
+    #[account(
+        mut,
+        seeds = [b"revenue_escrow", config.key().as_ref()],
+        bump
+    )]
+    pub revenue_escrow: Box<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        seeds = [b"insurance_escrow", config.key().as_ref()],
+        bump
+    )]
+    pub insurance_escrow: Box<Account<'info, TokenAccount>>,
+    #[account(mut)]
+    pub governance: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+pub fn activate_insurance_handler(ctx: Context<ActivateInsurance>, amount: u64) -> Result<()> {
+    require!(amount > 0, TreasuryError::ZeroAmount);
+    let revenue = ctx.accounts.revenue_escrow.amount;
+    require!(amount <= revenue, TreasuryError::InsufficientLiquidity);
+
+    let config_seed = [b"atlas_treasury".as_slice(), &[ctx.accounts.config.bump]];
+    token::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.revenue_escrow.to_account_info(),
+                to: ctx.accounts.insurance_escrow.to_account_info(),
+                authority: ctx.accounts.config.to_account_info(),
+            },
+            &[&config_seed],
+        ),
+        amount,
+    )?;
     Ok(())
 }
 

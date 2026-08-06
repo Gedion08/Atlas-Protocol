@@ -24,6 +24,10 @@ pub mod atlas_vault {
         initialize_handler(ctx, params)
     }
 
+    pub fn emergency_exit(ctx: Context<EmergencyExit>) -> Result<()> {
+        emergency_exit_handler(ctx)
+    }
+
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         deposit_handler(ctx, amount)
     }

@@ -42,7 +42,8 @@ export async function registerStakingRoutes(app: FastifyInstance, repos: Reposit
         }
         return { data: { exists: true, address: bondPdaKey.toBase58() } };
       } catch (error) {
-        app.log.error({ error }, "failed to fetch bond status");
+        const message = error instanceof Error ? error.message : "failed to fetch bond status";
+        app.log.error({ error, msg: message }, "failed to fetch bond status");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
       }
     },
@@ -84,7 +85,8 @@ export async function registerStakingRoutes(app: FastifyInstance, repos: Reposit
           },
         });
       } catch (error) {
-        app.log.error({ error }, "failed to build bond transaction");
+        const message = error instanceof Error ? error.message : "failed to build bond transaction";
+        app.log.error({ error, msg: message }, "failed to build bond transaction");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
       }
     },
@@ -116,7 +118,8 @@ export async function registerStakingRoutes(app: FastifyInstance, repos: Reposit
           },
         });
       } catch (error) {
-        app.log.error({ error }, "failed to build unbond transaction");
+        const message = error instanceof Error ? error.message : "failed to build unbond transaction";
+        app.log.error({ error, msg: message }, "failed to build unbond transaction");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
       }
     },
@@ -152,7 +155,8 @@ export async function registerStakingRoutes(app: FastifyInstance, repos: Reposit
           },
         });
       } catch (error) {
-        app.log.error({ error }, "failed to build claim transaction");
+        const message = error instanceof Error ? error.message : "failed to build claim transaction";
+        app.log.error({ error, msg: message }, "failed to build claim transaction");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
       }
     },

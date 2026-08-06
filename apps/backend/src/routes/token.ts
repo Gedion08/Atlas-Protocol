@@ -33,7 +33,8 @@ export async function registerTokenRoutes(app: FastifyInstance, repos: Repositor
         const balance = await getAtlasBalance(connection, new PublicKey(owner));
         return { data: { owner, mint: "7roukPrgB6rjLrJ9mqHoiCrMTjwYzT8UKbxGgtTRVtEa", balance } };
       } catch (error) {
-        app.log.error({ error }, "failed to fetch token balance");
+        const message = error instanceof Error ? error.message : "failed to fetch token balance";
+        app.log.error({ error, msg: message }, "failed to fetch token balance");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
       }
     },
@@ -81,7 +82,8 @@ export async function registerTokenRoutes(app: FastifyInstance, repos: Repositor
 
         return reply.status(200).send({ data: result });
       } catch (error) {
-        app.log.error({ error }, "failed to send faucet transaction");
+        const message = error instanceof Error ? error.message : "failed to send faucet transaction";
+        app.log.error({ error, msg: message }, "failed to send faucet transaction");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
       }
     },
@@ -105,7 +107,7 @@ export async function registerTokenRoutes(app: FastifyInstance, repos: Repositor
         });
 
         const result: SaleBuildResult = {
-          transaction: Buffer.from(transaction.serialize({ requireAllSignatures: false })).toString("base64"),
+          transaction: Buffer.from(transaction.serialize({ requireAllSignatures: false, verifySignatures: false })).toString("base64"),
           blockhash: transaction.recentBlockhash ?? (await connection.getLatestBlockhash()).blockhash,
           treasury: getTreasuryPubkey().toBase58(),
           recipient: body.buyer,
@@ -116,7 +118,8 @@ export async function registerTokenRoutes(app: FastifyInstance, repos: Repositor
 
         return { data: result };
       } catch (error) {
-        app.log.error({ error }, "failed to build sale transaction");
+        const message = error instanceof Error ? error.message : "failed to build sale transaction";
+        app.log.error({ error, msg: message }, "failed to build sale transaction");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });
       }
     },

@@ -145,6 +145,7 @@ export async function buildSaleTransaction(args: {
 
   transaction.feePayer = args.buyer;
   transaction.recentBlockhash = (await args.connection.getLatestBlockhash()).blockhash;
-  transaction.sign([treasury] as any);
-  return { transaction, ataAccounts };
+  transaction.sign(treasury);
+  const serialized = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+  return { transaction: Transaction.from(serialized), ataAccounts };
 }

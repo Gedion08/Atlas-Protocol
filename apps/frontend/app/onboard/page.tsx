@@ -51,6 +51,7 @@ export default function OnboardPage() {
         setError(err instanceof Error ? err.message : "Bond transaction failed");
       }
     },
+    onError: (err) => setError(err instanceof Error ? err.message : "Bond failed"),
   });
 
   const registerMutation = useMutation({
@@ -60,6 +61,7 @@ export default function OnboardPage() {
       queryClient.invalidateQueries({ queryKey: ["managers"] });
       queryClient.invalidateQueries({ queryKey: ["bondStatus", wallet] });
     },
+    onError: (err) => setError(err instanceof Error ? err.message : "Registration failed"),
   });
 
   return (

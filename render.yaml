@@ -1,4 +1,10 @@
 services:
+  # Required secrets (set in Render dashboard, not in this file):
+  # - ATLAS_TREASURY_KEYPAIR: JSON array treasury keypair for token sale and faucet
+  # - GOVERNANCE_KEYPAIR: JSON array governance keypair for circuit breaker
+  # - ORACLE_KEYPAIR: JSON array oracle signer keypair
+  # - HELIUS_API_KEY: Helius API key for webhooks
+  # - HELIUS_WEBHOOK_SECRET: Webhook signature secret
   - type: postgres
     name: atlas-protocol-db
     databaseName: atlas

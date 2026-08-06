@@ -25,10 +25,20 @@ async function get<T>(path: string): Promise<T | null> {
     const timer = setTimeout(() => controller.abort(), 2_500);
     const res = await fetch(`${API_URL}${path}`, { signal: controller.signal });
     clearTimeout(timer);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      const message = (body as { message?: string })?.message;
+      if (res.status >= 500) {
+        throw new Error(message ?? `Server error (${res.status})`);
+      }
+      return null;
+    }
     const body = await res.json();
     return body.data as T;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
     return null;
   }
 }

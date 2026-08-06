@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { REGISTRY_PROGRAM_ID } from "../registry/solana.js";
 
 export const STAKING_PROGRAM_ID = new PublicKey(
   "4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H",
@@ -25,6 +26,22 @@ export function bondPda(owner: PublicKey, programId: PublicKey = STAKING_PROGRAM
 
 export function bondEscrowPda(bond: PublicKey, programId: PublicKey = STAKING_PROGRAM_ID): [PublicKey, number] {
   return PublicKey.findProgramAddressSync([Buffer.from("escrow"), bond.toBuffer()], programId);
+}
+
+export async function getBondMint(connection: Connection): Promise<PublicKey> {
+  const [configPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("atlas_registry_config")],
+    REGISTRY_PROGRAM_ID,
+  );
+  const info = await connection.getAccountInfo(configPda);
+  if (!info) {
+    throw new Error("Registry config not found");
+  }
+  const data = info.data;
+  if (data.length < 146) {
+    throw new Error("Registry config account too small");
+  }
+  return new PublicKey(data.subarray(104, 136));
 }
 
 export function buildBondInstruction(args: {

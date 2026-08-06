@@ -9,8 +9,10 @@ import {
   buildBondInstruction,
   buildUnbondInstruction,
   buildClaimInstruction,
+  getBondMint,
 } from "../services/staking/solana.js";
 import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 const bondBody = z.object({
   owner: z.string().min(1),
@@ -34,7 +36,7 @@ export async function registerStakingRoutes(app: FastifyInstance, repos: Reposit
         const { owner } = request.params as { owner: string };
         const [bondPdaKey] = bondPda(new PublicKey(owner), STAKING_PROGRAM_ID);
         const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
-        const accountInfo = await connection.getAccountInfo(bondPdaKey);
+        const accountInfo = await connection.getAccountInfo(bondPdaKey).catch(() => null);
         if (!accountInfo) {
           return reply.status(404).send({ error: "bond_not_found", message: "No bond found for this owner", statusCode: 404 });
         }
@@ -54,13 +56,15 @@ export async function registerStakingRoutes(app: FastifyInstance, repos: Reposit
         const body = bondBody.parse(request.body);
         const ownerPubkey = new PublicKey(body.owner);
         const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
+        const bondMint = await getBondMint(connection);
+        const ownerToken = getAssociatedTokenAddressSync(bondMint, ownerPubkey, false, TOKEN_PROGRAM_ID);
         const [bondPdaKey] = bondPda(ownerPubkey, STAKING_PROGRAM_ID);
         const [escrowPdaKey] = bondEscrowPda(bondPdaKey, STAKING_PROGRAM_ID);
 
         const instruction = buildBondInstruction({
           owner: ownerPubkey,
-          bondMint: ownerPubkey,
-          ownerToken: ownerPubkey,
+          bondMint,
+          ownerToken,
           amount: body.amount,
           programId: STAKING_PROGRAM_ID,
         });
@@ -126,11 +130,13 @@ export async function registerStakingRoutes(app: FastifyInstance, repos: Reposit
         const body = claimBody.parse(request.body);
         const ownerPubkey = new PublicKey(body.owner);
         const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
+        const bondMint = await getBondMint(connection);
+        const ownerToken = getAssociatedTokenAddressSync(bondMint, ownerPubkey, false, TOKEN_PROGRAM_ID);
 
         const instruction = buildClaimInstruction({
           owner: ownerPubkey,
-          bondMint: ownerPubkey,
-          ownerToken: ownerPubkey,
+          bondMint,
+          ownerToken,
           programId: STAKING_PROGRAM_ID,
         });
 

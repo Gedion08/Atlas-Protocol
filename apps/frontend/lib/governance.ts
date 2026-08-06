@@ -40,7 +40,13 @@ export function resolveProposal(
   };
 }
 
-export function timeLeftLabel(endVotingAt: number, status: string) {
+export function voteProgress(forVotes: number, againstVotes: number): number {
+  const total = forVotes + againstVotes;
+  if (total === 0) return 0;
+  return (forVotes / total) * 100;
+}
+
+export function timeLeftLabel(endVotingAt: number, status: string): string | null {
   if (status !== "active") return null;
   const seconds = endVotingAt - Math.floor(Date.now() / 1000);
   if (seconds <= 0) return "finalizing";

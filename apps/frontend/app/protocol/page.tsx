@@ -7,6 +7,7 @@ import { formatPct, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ErrorState } from "@/components/error-state";
 
 const riskRules = [
   { id: "max_drawdown", name: "Maximum drawdown", limit: 0.15, severity: "critical" },
@@ -36,8 +37,10 @@ function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: st
 }
 
 export default function ProtocolPage() {
-  const { data: managers } = useQuery({ queryKey: ["managers"], queryFn: api.managers });
-  const { data: vaults } = useQuery({ queryKey: ["vaults"], queryFn: api.vaults });
+  const managersQuery = useQuery({ queryKey: ["managers"], queryFn: api.managers });
+  const { data: managers } = managersQuery;
+  const vaultsQuery = useQuery({ queryKey: ["vaults"], queryFn: api.vaults });
+  const { data: vaults } = vaultsQuery;
 
   const totalTvl = vaults?.reduce((a, v) => a + v.tvl, 0) ?? 0;
   const totalBonded = (managers ?? []).reduce((a, m) => a + m.bondAmount, 0);
@@ -58,7 +61,20 @@ export default function ProtocolPage() {
         <Stat icon={Activity} label="Reallocations" value="hourly" />
       </section>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {(managersQuery.isLoading || vaultsQuery.isLoading) && !managers && !vaults ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card><CardContent className="p-6 space-y-3">
+            <div className="h-5 w-32 animate-pulse rounded bg-muted/40" />
+            <div className="h-4 w-full animate-pulse rounded bg-muted/40" />
+            <div className="h-4 w-full animate-pulse rounded bg-muted/40" />
+          </CardContent></Card>
+          <Card><CardContent className="p-6 space-y-3">
+            <div className="h-5 w-32 animate-pulse rounded bg-muted/40" />
+            <div className="h-4 w-full animate-pulse rounded bg-muted/40" />
+          </CardContent></Card>
+        </div>
+      ) : (
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Risk Rules</CardTitle>
@@ -122,6 +138,10 @@ export default function ProtocolPage() {
           </Card>
         </div>
       </section>
+      )}
+      {(managersQuery.isError || vaultsQuery.isError) && (
+        <ErrorState message="Failed to load protocol data." onRetry={() => { managersQuery.refetch(); vaultsQuery.refetch(); }} />
+      )}
     </div>
   );
 }

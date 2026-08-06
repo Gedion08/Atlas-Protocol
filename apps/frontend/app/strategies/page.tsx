@@ -8,6 +8,8 @@ import { api } from "@/lib/api";
 import { formatApy, formatPct, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/error-state";
+import { StrategyCardSkeleton } from "@/components/skeletons/strategy-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StrategyUploadForm } from "@/components/strategy-upload-form";
 
@@ -22,8 +24,10 @@ const filters = [
 ] as const;
 
 export default function StrategiesPage() {
-  const { data: strategies } = useQuery({ queryKey: ["strategies"], queryFn: api.strategies });
-  const { data: managers } = useQuery({ queryKey: ["managers"], queryFn: api.managers });
+  const strategiesQuery = useQuery({ queryKey: ["strategies"], queryFn: api.strategies });
+  const { data: strategies } = strategiesQuery;
+  const managersQuery = useQuery({ queryKey: ["managers"], queryFn: api.managers });
+  const { data: managers } = managersQuery;
   const [filter, setFilter] = useState<(typeof filters)[number]>("all");
   const [managerFilter, setManagerFilter] = useState<string | null>(null);
 
@@ -80,7 +84,19 @@ export default function StrategiesPage() {
 
       <StrategyUploadForm managers={managers ?? []} />
 
+      {strategiesQuery.isLoading && !strategies ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <StrategyCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {strategiesQuery.isError && (
+          <div className="md:col-span-2 lg:col-span-3">
+            <ErrorState message="Failed to load strategies." onRetry={() => strategiesQuery.refetch()} />
+          </div>
+        )}
         {filtered.map((s) => {
           const manager = (managers ?? []).find((m) => m.id === s.managerId);
           return (
@@ -144,7 +160,7 @@ export default function StrategiesPage() {
             </Card>
           );
         })}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !strategiesQuery.isLoading && !strategiesQuery.isError && (
           <Card className="md:col-span-2 lg:col-span-3">
             <CardContent className="p-8 text-center text-sm text-muted-foreground">
               No strategies match the current filters.
@@ -152,6 +168,7 @@ export default function StrategiesPage() {
           </Card>
         )}
       </div>
+      )}
     </div>
   );
 }

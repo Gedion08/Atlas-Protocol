@@ -154,4 +154,15 @@ export const api = {
       input,
       { "x-atlas-owner": owner },
     ),
+  stakingBond: async (owner: string, amount: number) =>
+    post<{ transaction: string; owner: string; amount: number; bondPda: string; escrowPda: string }>(
+      "/api/v1/staking/bond",
+      { owner, amount },
+    ),
+  stakingUnbond: async (owner: string) =>
+    post<{ transaction: string; owner: string }>("/api/v1/staking/unbond", { owner }),
+  stakingClaim: async (owner: string) =>
+    post<{ transaction: string; owner: string }>("/api/v1/staking/claim", { owner }),
+  stakingBondStatus: async (owner: string) =>
+    get<{ exists: boolean; address?: string }>(`/api/v1/staking/bond/${owner}`),
 };

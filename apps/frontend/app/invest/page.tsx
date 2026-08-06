@@ -8,6 +8,8 @@ import type { InvestorPosition, Vault } from "atlas-types";
 import { api } from "@/lib/api";
 import { formatApy, formatNumber, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/error-state";
+import { VaultCardSkeleton } from "@/components/skeletons/vault-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InvestDialog } from "@/components/invest-dialog";

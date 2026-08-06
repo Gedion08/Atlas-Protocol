@@ -12,8 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState } from "@/components/error-state";
 
 const STEPS = ["Connect", "Bond", "Register", "Complete"] as const;
@@ -46,7 +44,7 @@ export default function OnboardPage() {
         const transaction = Transaction.from(txBuffer);
         const signed = await signTransaction(transaction);
         const connection = new Connection("https://api.devnet.solana.com");
-        const signature = await sendTransaction(signed, connection);
+        await sendTransaction(signed, connection);
         setError(null);
         setStep("Register");
       } catch (err) {
@@ -63,8 +61,6 @@ export default function OnboardPage() {
       queryClient.invalidateQueries({ queryKey: ["bondStatus", wallet] });
     },
   });
-
-  const canProceed = step === "Connect" ? connected : step === "Bond" ? bondStatusQuery.data?.exists || bondMutation.isSuccess : step === "Register" ? managerName.trim().length > 0 : false;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

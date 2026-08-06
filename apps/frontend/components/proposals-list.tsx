@@ -55,8 +55,6 @@ export function ProposalsList({ statusFilter, onStatusFilterChange }: ProposalsL
     (p) => statusFilter === "all" || p.status === statusFilter,
   );
 
-  const activeCount = (proposals ?? []).filter((p) => p.status === "active").length;
-
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">

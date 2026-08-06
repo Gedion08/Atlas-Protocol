@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import type { ProposalClass } from "atlas-types";
 import { classParams, resolveProposal } from "@/lib/governance";
 
 function timeLeftLabel(endVotingAt: number, status: string) {

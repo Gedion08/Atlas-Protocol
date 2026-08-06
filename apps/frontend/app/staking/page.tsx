@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
 import { Loader2, Plus, Unplug, Wallet } from "lucide-react";
@@ -13,11 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState } from "@/components/error-state";
-import { formatUsd } from "@/lib/format";
 
 export default function StakingPage() {
   const { connected, publicKey, signTransaction, sendTransaction } = useWallet();
-  const queryClient = useQueryClient();
   const wallet = publicKey?.toBase58() ?? "";
   const [bondAmount, setBondAmount] = useState("");
   const [error, setError] = useState<string | null>(null);

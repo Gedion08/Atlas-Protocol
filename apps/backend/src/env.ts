@@ -61,7 +61,7 @@ const envSchema = z.object({
   HELIUS_WEBHOOK_SECRET: z.string().optional(),
   HELIUS_WEBHOOK_SIGNATURE_HEADER: z.string().default("x-webhook-signature"),
   HELIUS_API_KEY: z.string().default(""),
-  SOLANA_RPC_URL: z.string().url().default("https://devnet.helius-rpc.com"),
+  SOLANA_RPC_URL: z.string().url().default("https://api.devnet.solana.com"),
   ATLAS_TREASURY_KEYPAIR: z.string().optional(),
   ATLAS_FAUCET_AMOUNT: z.coerce.number().positive().default(1000),
   ATLAS_SALE_RATE: z.coerce.number().positive().default(1000),

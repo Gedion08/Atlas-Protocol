@@ -46,6 +46,7 @@ export default function StakingPage() {
         setError(err instanceof Error ? err.message : "Bond transaction failed");
       }
     },
+    onError: (err) => setError(err instanceof Error ? err.message : "Bond failed"),
   });
 
   const unbondMutation = useMutation({
@@ -67,6 +68,7 @@ export default function StakingPage() {
         setError(err instanceof Error ? err.message : "Unbond transaction failed");
       }
     },
+    onError: (err) => setError(err instanceof Error ? err.message : "Unbond failed"),
   });
 
   const claimMutation = useMutation({
@@ -88,6 +90,7 @@ export default function StakingPage() {
         setError(err instanceof Error ? err.message : "Claim transaction failed");
       }
     },
+    onError: (err) => setError(err instanceof Error ? err.message : "Claim failed"),
   });
 
   if (!connected) {

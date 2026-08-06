@@ -66,19 +66,35 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   });
   const serverUrl = `http://${env.HOST === "0.0.0.0" ? "localhost" : env.HOST}:${env.BACKEND_PORT}`;
 
-  const timeSeries =
-    options.timeSeries ??
-    (env.REPOSITORY_DRIVER === "postgres"
-      ? new PgTimeSeriesStore(buildPgPool(env.DATABASE_URL, { max: 5 }))
-      : env.CLICKHOUSE_ENABLED
-        ? new ClickHouseTimeSeriesStore(env.CLICKHOUSE_URL)
-        : new InMemoryTimeSeriesStore());
+  let timeSeries: TimeSeriesStore;
+  if (options.timeSeries) {
+    timeSeries = options.timeSeries;
+  } else if (env.REPOSITORY_DRIVER === "postgres") {
+    try {
+      timeSeries = new PgTimeSeriesStore(buildPgPool(env.DATABASE_URL, { max: 5 }));
+    } catch (error) {
+      app.log.warn({ error }, "failed to connect to PostgreSQL for timeSeries, falling back to in-memory");
+      timeSeries = new InMemoryTimeSeriesStore();
+    }
+  } else if (env.CLICKHOUSE_ENABLED) {
+    timeSeries = new ClickHouseTimeSeriesStore(env.CLICKHOUSE_URL);
+  } else {
+    timeSeries = new InMemoryTimeSeriesStore();
+  }
 
-  const repositories =
-    options.repositories ??
-    (env.REPOSITORY_DRIVER === "postgres"
-      ? await createPostgresRepositories()
-      : createMemoryRepositories(timeSeries));
+  let repositories: Repositories;
+  if (options.repositories) {
+    repositories = options.repositories;
+  } else if (env.REPOSITORY_DRIVER === "postgres") {
+    try {
+      repositories = await createPostgresRepositories();
+    } catch (error) {
+      app.log.warn({ error }, "failed to connect to PostgreSQL, falling back to in-memory repositories");
+      repositories = createMemoryRepositories(timeSeries);
+    }
+  } else {
+    repositories = createMemoryRepositories(timeSeries);
+  }
 
   const aggregator = new MetricsAggregator(timeSeries);
   eventBus.subscribe((event) => void aggregator.ingest([event]));

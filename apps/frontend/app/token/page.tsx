@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
 import { Coins, Wallet, Loader2, TrendingUp, Gift } from "lucide-react";
 import { api } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +22,6 @@ function formatSol(lamports: number): string {
 export default function TokenPage() {
   const { connected, publicKey, signTransaction, sendTransaction } = useWallet();
   const wallet = publicKey?.toBase58() ?? "";
-  const queryClient = useQueryClient();
 
   const [faucetAmount, setFaucetAmount] = useState("");
   const [saleSol, setSaleSol] = useState("");

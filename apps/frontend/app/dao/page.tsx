@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, Transaction } from "@solana/web3.js";
@@ -20,7 +20,6 @@ import type { ProposalClass, ProposalInput } from "atlas-types";
 const inputClass =
   "w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary";
 
-const MIN_LOCK_SECS = 7 * 86_400;
 const MAX_LOCK_SECS = 4 * 365 * 86_400;
 const YEAR_SECS = 365 * 86_400;
 
@@ -172,8 +171,8 @@ function CreateVeLockForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <div className="space-y-1">
           <Label htmlFor="lock-duration">Duration</Label>
-          <Select value={duration} onValueChange={setDuration}>
-            <SelectTrigger id="lock-duration" className={inputClass}>
+          <Select value={duration} onChange={(e) => setDuration(e.target.value)}>
+            <SelectTrigger className={inputClass}>
               <SelectValue placeholder="Select duration" />
             </SelectTrigger>
             <SelectContent>

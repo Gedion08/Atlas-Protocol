@@ -1,20 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Landmark, ShieldCheck, Users, Vote } from "lucide-react";
+import { Connection, Transaction } from "@solana/web3.js";
+import { Landmark, ShieldCheck, Users, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ProposalClass, ProposalInput } from "atlas-types";
 
 const inputClass =
   "w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary";
+
+const MIN_LOCK_SECS = 7 * 86_400;
+const MAX_LOCK_SECS = 4 * 365 * 86_400;
+const YEAR_SECS = 365 * 86_400;
+
+function durationMultiplierBps(durationSecs: number): number {
+  if (durationSecs <= 0) return 0;
+  if (durationSecs < YEAR_SECS) {
+    const bps = 2500 + (7500 * durationSecs) / YEAR_SECS;
+    return Math.max(2500, Math.min(10000, bps));
+  }
+  if (durationSecs >= MAX_LOCK_SECS) return 25000;
+  const extra = (15000 * (durationSecs - YEAR_SECS)) / (3 * YEAR_SECS);
+  return Math.min(25000, 10000 + extra);
+}
+
+function calcWeight(amount: number, durationSecs: number): number {
+  return (amount * durationMultiplierBps(durationSecs)) / 10000;
+}
+
+const LOCK_DURATIONS = [
+  { label: "1 month", value: 30 * 86_400 },
+  { label: "3 months", value: 90 * 86_400 },
+  { label: "6 months", value: 180 * 86_400 },
+  { label: "1 year", value: 365 * 86_400 },
+  { label: "2 years", value: 730 * 86_400 },
+  { label: "4 years", value: 1460 * 86_400 },
+];
 
 const CLASSES: { value: ProposalClass; label: string; description: string }[] = [
   { value: "parametric", label: "Parametric", description: "Risk parameters & limits · 5% quorum" },
@@ -62,6 +94,125 @@ function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: st
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
           <p className="text-xl font-semibold">{value}</p>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateVeLockForm({ onSuccess }: { onSuccess: () => void }) {
+  const { connected, publicKey, signTransaction, sendTransaction } = useWallet();
+  const wallet = publicKey?.toBase58() ?? "";
+  const [amount, setAmount] = useState("");
+  const [duration, setDuration] = useState<string>(String(LOCK_DURATIONS[3].value));
+  const [error, setError] = useState<string | null>(null);
+
+  const durationSecs = Number(duration);
+  const amountNum = Number(amount);
+  const weight = amountNum > 0 && durationSecs > 0 ? calcWeight(amountNum, durationSecs) : 0;
+  const multiplier = durationSecs > 0 ? durationMultiplierBps(durationSecs) / 10000 : 0;
+
+  const lockMutation = useMutation({
+    mutationFn: async () => {
+      if (!wallet) throw new Error("Connect your wallet first");
+      const data = await api.createVeLock(wallet, amountNum, durationSecs);
+      if (!signTransaction || !sendTransaction) {
+        throw new Error("Wallet does not support signing transactions.");
+      }
+      const txBuffer = Buffer.from(data.transaction, "base64");
+      const transaction = Transaction.from(txBuffer);
+      const signed = await signTransaction(transaction);
+      const connection = new Connection("https://api.devnet.solana.com");
+      await sendTransaction(signed, connection);
+      return data;
+    },
+    onSuccess: () => {
+      setAmount("");
+      setDuration(String(LOCK_DURATIONS[3].value));
+      setError(null);
+      onSuccess();
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : "Failed to create ve-lock"),
+  });
+
+  if (!connected) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Create ve-lock</CardTitle>
+          <CardDescription>Lock ATLAS to get voting weight</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
+          <Wallet className="h-8 w-8 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Connect your wallet to lock ATLAS for governance.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Create ve-lock</CardTitle>
+        <CardDescription>Lock ATLAS to get voting weight</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="space-y-1">
+          <Label htmlFor="lock-amount">Amount (ATLAS)</Label>
+          <Input
+            id="lock-amount"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            min="1"
+            step="1"
+            placeholder="e.g. 1000"
+            className={inputClass}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="lock-duration">Duration</Label>
+          <Select value={duration} onValueChange={setDuration}>
+            <SelectTrigger id="lock-duration" className={inputClass}>
+              <SelectValue placeholder="Select duration" />
+            </SelectTrigger>
+            <SelectContent>
+              {LOCK_DURATIONS.map((d) => (
+                <SelectItem key={d.value} value={String(d.value)}>
+                  {d.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {amountNum > 0 && (
+          <div className="space-y-2 rounded-md border border-border p-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Multiplier</span>
+              <span className="font-medium">{multiplier.toFixed(2)}x</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Ve-ATLAS weight</span>
+              <span className="font-semibold">{weight.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Unlocks</span>
+              <span className="font-medium">
+                {new Date(Date.now() + durationSecs * 1000).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        )}
+        <Button
+          onClick={() => lockMutation.mutate()}
+          disabled={lockMutation.isPending || !amount || amountNum <= 0 || durationSecs <= 0}
+          className="w-full"
+        >
+          {lockMutation.isPending ? "Locking…" : "Lock ATLAS"}
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Locked ATLAS is non-transferable until the unlock date. Early withdrawal is not supported.
+        </p>
       </CardContent>
     </Card>
   );
@@ -293,6 +444,7 @@ export default function DaoPage() {
         </Card>
 
         <div className="space-y-4">
+          <CreateVeLockForm onSuccess={() => queryClient.invalidateQueries({ queryKey: ["locks"] })} />
           <Card>
             <CardHeader>
               <CardTitle className="text-base">My voting power</CardTitle>

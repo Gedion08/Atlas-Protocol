@@ -117,6 +117,26 @@ export const api = {
     ),
   locks: async (): Promise<VeLockView[] | null> =>
     get<VeLockView[]>("/api/v1/governance/locks"),
+  createVeLock: async (owner: string, amount: number, durationSecs: number): Promise<{
+    transaction: string;
+    blockhash: string;
+    config: string;
+    vault: string;
+    lock: string;
+    atlasMint: string;
+    amount: number;
+    durationSecs: number;
+  }> =>
+    post<{
+      transaction: string;
+      blockhash: string;
+      config: string;
+      vault: string;
+      lock: string;
+      atlasMint: string;
+      amount: number;
+      durationSecs: number;
+    }>("/api/v1/governance/locks/build", { owner, amount, durationSecs }),
   votes: async (id: string): Promise<GovernanceVote[]> =>
     (await get<GovernanceVote[]>(`/api/v1/governance/proposals/${id}/votes`)) ?? [],
   investorPositions: async (wallet: string): Promise<InvestorPosition[]> =>
@@ -165,4 +185,31 @@ export const api = {
     post<{ transaction: string; owner: string }>("/api/v1/staking/claim", { owner }),
   stakingBondStatus: async (owner: string) =>
     get<{ exists: boolean; address?: string }>(`/api/v1/staking/bond/${owner}`),
+  tokenBalance: async (owner: string) =>
+    get<{ owner: string; mint: string; balance: number }>(`/api/v1/token/balance/${owner}`),
+  tokenSaleInfo: async () =>
+    get<{
+      mint: string;
+      treasury: string;
+      rate: number;
+      minSol: number;
+      maxSol: number;
+      faucetAmount: number;
+      faucetCooldownSecs: number;
+    }>("/api/v1/token/sale/info"),
+  tokenFaucet: async (recipient: string, amount?: number) =>
+    post<{ signature: string; recipient: string; amount: number }>("/api/v1/token/faucet", {
+      recipient,
+      amount: amount ?? 1000,
+    }),
+  tokenSaleBuild: async (buyer: string, solAmount: number) =>
+    post<{
+      transaction: string;
+      blockhash: string;
+      treasury: string;
+      recipient: string;
+      solAmount: number;
+      atlasAmount: number;
+      ataAccounts: string[];
+    }>("/api/v1/token/sale/build", { buyer, solAmount }),
 };

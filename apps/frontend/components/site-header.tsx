@@ -12,6 +12,8 @@ const nav = [
   { href: "/strategies", label: "Strategies" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/dao", label: "DAO" },
+  { href: "/staking", label: "Staking" },
+  { href: "/token", label: "Token" },
   { href: "/protocol", label: "Protocol" },
 ];
 

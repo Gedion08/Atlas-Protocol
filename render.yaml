@@ -17,9 +17,11 @@ services:
       - key: DB_AUTO_MIGRATE
         value: "true"
       - key: DB_AUTO_SEED
-        value: "false"
+        value: "true"
+      - key: SOLANA_RPC_URL
+        value: https://devnet.helius-rpc.com/?api-key=8b2dc0c5-66c0-492b-8dc5-53e99da14369
       - key: CORS_ORIGINS
-        value: https://atlas-protocol-frontend-9xuga44dd-gideon-njunges-projects.vercel.app
+        value: https://atlas-protocol-frontend.vercel.app
       - key: DATABASE_URL
         fromService:
           type: postgres

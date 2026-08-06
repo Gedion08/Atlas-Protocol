@@ -103,13 +103,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   let indexer: Indexer | null = null;
   if (env.KAFKA_ENABLED) {
-    indexer = new Indexer({
-      brokers: env.KAFKA_BROKERS.split(",").map((b) => b.trim()),
-      eventBus,
-      store: timeSeries,
-    });
-    await indexer.startProducer();
-    await indexer.startConsumer();
+    try {
+      indexer = new Indexer({
+        brokers: env.KAFKA_BROKERS.split(",").map((b) => b.trim()),
+        eventBus,
+        store: timeSeries,
+      });
+      await indexer.startProducer();
+      await indexer.startConsumer();
+    } catch (err) {
+      console.error("failed to start Kafka indexer, continuing without it", err);
+      indexer = null;
+    }
   }
 
   let oracleLoop: OracleLoop | null = null;

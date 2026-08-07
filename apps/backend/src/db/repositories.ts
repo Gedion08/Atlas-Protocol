@@ -15,9 +15,10 @@ import type {
   VeLockView,
   VoteInput,
 } from "atlas-types";
+import type { ClaimAssessment, ClaimPayout, InsuranceClaim } from "../services/insurance/models.js";
 import type { OracleSubmission } from "../services/oracle/index.js";
 import type { TimeSeriesStore } from "../services/ingestion/timeseries.js";
-import { seedLocks, seedManagers, seedProposals, seedStrategies, seedVaults } from "./seed.js";
+import { seedLocks, seedManagers, seedProposals, seedStrategies, seedVaults, seedClaims } from "./seed.js";
 import { bootstrapVault, readBootstrapState } from "./bootstrap-state.js";
 import { classParams, lockWeight, resolveProposal, VOTING_DURATION_SECS } from "../services/governance/index.js";
 import { computePerfMetrics } from "../services/perf-metrics/index.js";
@@ -69,6 +70,15 @@ export interface GovernanceRepository {
   updateProposalStatus(id: string, status: ProposalStatus): Promise<void>;
 }
 
+export interface InsuranceRepository {
+  listClaims(filter?: { vaultAddress?: string; claimant?: string; status?: string }): Promise<InsuranceClaim[]>;
+  getClaim(id: string): Promise<InsuranceClaim | null>;
+  createClaim(claim: InsuranceClaim): Promise<InsuranceClaim>;
+  updateClaim(claim: InsuranceClaim): Promise<InsuranceClaim>;
+  recordAssessment(assessment: ClaimAssessment): Promise<InsuranceClaim>;
+  recordPayout(payout: ClaimPayout): Promise<InsuranceClaim>;
+}
+
 export interface Repositories {
   managers: ManagerRepository;
   strategies: StrategyRepository;
@@ -76,6 +86,7 @@ export interface Repositories {
   investors: InvestorRepository;
   oracle: OracleRepository;
   governance: GovernanceRepository;
+  insurance: InsuranceRepository;
 }
 
 function makePerformance(
@@ -413,6 +424,56 @@ export class InMemoryInvestorRepository implements InvestorRepository {
   }
 }
 
+export class InMemoryInsuranceRepository implements InsuranceRepository {
+  constructor(private readonly claims: InsuranceClaim[] = []) {}
+
+  async listClaims(filter?: { vaultAddress?: string; claimant?: string; status?: string }): Promise<InsuranceClaim[]> {
+    return this.claims.filter((c) => {
+      if (filter?.vaultAddress && c.vaultAddress !== filter.vaultAddress) return false;
+      if (filter?.claimant && c.claimant !== filter.claimant) return false;
+      if (filter?.status && c.status !== filter.status) return false;
+      return true;
+    });
+  }
+
+  async getClaim(id: string): Promise<InsuranceClaim | null> {
+    return this.claims.find((c) => c.id === id) ?? null;
+  }
+
+  async createClaim(claim: InsuranceClaim): Promise<InsuranceClaim> {
+    this.claims.push(claim);
+    return claim;
+  }
+
+  async updateClaim(claim: InsuranceClaim): Promise<InsuranceClaim> {
+    const index = this.claims.findIndex((c) => c.id === claim.id);
+    if (index >= 0) this.claims[index] = claim;
+    return claim;
+  }
+
+  async recordAssessment(assessment: ClaimAssessment): Promise<InsuranceClaim> {
+    const claim = this.claims.find((c) => c.id === assessment.claimId);
+    if (!claim) throw new Error("Claim not found");
+    claim.status = "approved";
+    claim.decidedAt = assessment.decidedAt;
+    claim.decidedBy = assessment.assessor;
+    claim.assessmentNotes = assessment.notes;
+    claim.coInsuranceAmount = (assessment.recommendedAmount * assessment.coInsuranceBps) / 10_000;
+    await this.updateClaim(claim);
+    return claim;
+  }
+
+  async recordPayout(payout: ClaimPayout): Promise<InsuranceClaim> {
+    const claim = this.claims.find((c) => c.id === payout.claimId);
+    if (!claim) throw new Error("Claim not found");
+    claim.status = "paid";
+    claim.payoutSignature = payout.signature;
+    claim.paidAt = payout.paidAt;
+    await this.updateClaim(claim);
+    return claim;
+  }
+}
+
 export function createMemoryRepositories(
   timeSeries?: TimeSeriesStore,
 ): Repositories {
@@ -425,5 +486,6 @@ export function createMemoryRepositories(
     investors: new InMemoryInvestorRepository(),
     oracle: new InMemoryOracleRepository(),
     governance: new InMemoryGovernanceRepository(seedProposals, seedLocks),
+    insurance: new InMemoryInsuranceRepository(seedClaims),
   };
 }

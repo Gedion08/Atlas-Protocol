@@ -5,6 +5,7 @@ import type {
   Vault,
   VeLockView,
 } from "atlas-types";
+import type { InsuranceClaim } from "../services/insurance/models.js";
 
 export const seedManagers: ManagerProfile[] = [
   {
@@ -737,5 +738,48 @@ export const seedProposals: GovernanceProposal[] = [
     endVotingAt: Math.floor(Date.now() / 1000) - 3 * 86_400,
     executionAt: Math.floor(Date.now() / 1000) + 27 * 86_400,
     status: "succeeded",
+  },
+];
+
+export const seedClaims: InsuranceClaim[] = [
+  {
+    id: "clm_001",
+    vaultAddress: seedVaults[0].address,
+    claimant: seedManagers[0].owner,
+    amount: 50_000,
+    coInsuranceAmount: 2_500,
+    eventType: "smart_contract_exploit",
+    evidence: "On-chain transaction hash and post-mortem report",
+    eventTs: Date.now() - 7 * 86_400_000,
+    status: "pending",
+    createdAt: Date.now() - 6 * 86_400_000,
+  },
+  {
+    id: "clm_002",
+    vaultAddress: seedVaults[1].address,
+    claimant: seedManagers[2].owner,
+    amount: 120_000,
+    coInsuranceAmount: 6_000,
+    eventType: "oracle_failure",
+    evidence: "Oracle deviation logs and price feed snapshots",
+    eventTs: Date.now() - 14 * 86_400_000,
+    status: "assessing",
+    assessmentNotes: "Awaiting actuarial review for standard claim tier",
+    createdAt: Date.now() - 13 * 86_400_000,
+  },
+  {
+    id: "clm_003",
+    vaultAddress: seedVaults[2].address,
+    claimant: seedManagers[1].owner,
+    amount: 6_000_000,
+    coInsuranceAmount: 300_000,
+    eventType: "automation_failure",
+    evidence: "Keeper failure logs and missed rebalance transactions",
+    eventTs: Date.now() - 21 * 86_400_000,
+    status: "approved",
+    decidedAt: Date.now() - 3 * 86_400_000,
+    decidedBy: "claims_committee",
+    assessmentNotes: "Approved by committee with governance supermajority signal",
+    createdAt: Date.now() - 20 * 86_400_000,
   },
 ];

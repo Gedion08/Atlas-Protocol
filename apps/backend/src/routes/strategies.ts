@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Repositories } from "../db/repositories.js";
 import { riskTierFromScore } from "../services/scoring/index.js";
 import { NonceStore, requireWalletSignature } from "../services/auth/signature.js";
-import { validateStrategyParams } from "atlas-types";
+import { validateStrategyParams } from "strategy-sdk";
 
 const strategyQuery = z.object({
   managerId: z.string().optional(),

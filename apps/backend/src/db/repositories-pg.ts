@@ -19,10 +19,12 @@ import type {
 import type { Pool } from "pg";
 import { env } from "../env.js";
 import type { OracleSubmission } from "../services/oracle/index.js";
+import type { InsuranceClaim } from "../services/insurance/models.js";
 import { buildPgPool, runMigrations, seedIfEmpty, upsertBootstrapVault } from "./bootstrap.js";
 import { classParams, lockWeight, VOTING_DURATION_SECS } from "../services/governance/index.js";
 import type {
   GovernanceRepository,
+  InsuranceRepository,
   InvestorRepository,
   ManagerRepository,
   OracleRepository,
@@ -563,6 +565,34 @@ export class PgGovernanceRepository implements GovernanceRepository {
   }
 }
 
+export class PgInsuranceRepository implements InsuranceRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async listClaims(): Promise<InsuranceClaim[]> {
+    return [];
+  }
+
+  async getClaim(id: string): Promise<InsuranceClaim | null> {
+    return null;
+  }
+
+  async createClaim(claim: InsuranceClaim): Promise<InsuranceClaim> {
+    return claim;
+  }
+
+  async updateClaim(claim: InsuranceClaim): Promise<InsuranceClaim> {
+    return claim;
+  }
+
+  async recordAssessment(): Promise<InsuranceClaim> {
+    throw new Error("Not implemented");
+  }
+
+  async recordPayout(): Promise<InsuranceClaim> {
+    throw new Error("Not implemented");
+  }
+}
+
 export interface PostgresRepositoriesOptions {
   connectionString?: string;
   autoMigrate?: boolean;
@@ -591,5 +621,6 @@ export async function createPostgresRepositories(
     investors: new PgInvestorRepository(pool),
     oracle: new PgOracleRepository(pool),
     governance: new PgGovernanceRepository(pool),
+    insurance: new PgInsuranceRepository(pool),
   };
 }

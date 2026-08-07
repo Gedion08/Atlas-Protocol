@@ -7,10 +7,12 @@ import type {
   ManagerProfile,
   RiskDecision,
   Strategy,
+  StrategyType,
   StrategyUpload,
   Vault,
   WithdrawInput,
 } from "atlas-types";
+import { validateStrategyParams, getStrategySchema, listStrategyTypes } from "strategy-sdk";
 
 export interface AtlasClientOptions {
   /** Base URL of the Atlas API. Defaults to http://localhost:4000. */
@@ -121,6 +123,18 @@ export class AtlasClient {
       headers,
       body: JSON.stringify(upload),
     });
+  }
+
+  validateStrategyParams(type: string, params?: Record<string, unknown>) {
+    return validateStrategyParams(type as StrategyType, params);
+  }
+
+  getStrategySchema(type: string) {
+    return getStrategySchema(type as StrategyType);
+  }
+
+  listStrategyTypes() {
+    return listStrategyTypes();
   }
 
   async getManagers(): Promise<ManagerProfile[]> {

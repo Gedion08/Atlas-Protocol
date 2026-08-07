@@ -14,6 +14,7 @@ import { registerOracleRoutes } from "./routes/oracle.js";
 import { registerGovernanceRoutes } from "./routes/governance.js";
 import { registerGovernanceExecutionRoutes } from "./routes/governance-execution.js";
 import { registerInsuranceRoutes } from "./routes/insurance.js";
+import { registerEmergencyExitRoutes } from "./routes/emergency-exit.js";
 import { registerStakingRoutes } from "./routes/staking.js";
 import { registerTokenRoutes } from "./routes/token.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
@@ -233,6 +234,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     scoped.register(async (r) => registerGovernanceRoutes(r, repositories));
     scoped.register(async (r) => registerGovernanceExecutionRoutes(r, repositories));
     scoped.register(async (r) => registerInsuranceRoutes(r, repositories));
+    scoped.register(async (r) => registerEmergencyExitRoutes(r, repositories, vaultClient));
     scoped.register(async (r) => registerStakingRoutes(r, repositories));
     scoped.register(async (r) => registerTokenRoutes(r, repositories));
     scoped.register(async (r) => registerWebhookRoutes(r, env, repositories));

@@ -1,6 +1,7 @@
 FROM node:22-alpine AS base
 ENV CI=true
 RUN corepack enable
+RUN apk add --no-cache python3 build-base
 WORKDIR /app
 
 ARG PNPM_FLAGS=--network-concurrency\ 3\ --fetch-retries\ 10\ --fetch-timeout\ 120000

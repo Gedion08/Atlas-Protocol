@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Connection, Transaction } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
+import { decodeTransaction } from "@/lib/solana";
 import { Landmark, ShieldCheck, Users, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -99,7 +100,7 @@ function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: st
 }
 
 function CreateVeLockForm({ onSuccess }: { onSuccess: () => void }) {
-  const { connected, publicKey, signTransaction, sendTransaction } = useWallet();
+  const { connected, publicKey, sendTransaction } = useWallet();
   const wallet = publicKey?.toBase58() ?? "";
   const [amount, setAmount] = useState("");
   const [duration, setDuration] = useState<string>(String(LOCK_DURATIONS[3].value));
@@ -114,14 +115,12 @@ function CreateVeLockForm({ onSuccess }: { onSuccess: () => void }) {
     mutationFn: async () => {
       if (!wallet) throw new Error("Connect your wallet first");
       const data = await api.createVeLock(wallet, amountNum, durationSecs);
-      if (!signTransaction || !sendTransaction) {
-        throw new Error("Wallet does not support signing transactions.");
+      if (!sendTransaction) {
+        throw new Error("Wallet does not support sending transactions.");
       }
-      const txBuffer = Buffer.from(data.transaction, "base64");
-      const transaction = Transaction.from(txBuffer);
-      const signed = await signTransaction(transaction);
+      const transaction = decodeTransaction(data.transaction);
       const connection = new Connection("https://api.devnet.solana.com");
-      await sendTransaction(signed, connection);
+      await sendTransaction(transaction, connection);
       return data;
     },
     onSuccess: () => {

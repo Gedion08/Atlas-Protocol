@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Connection, Transaction } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
+import { decodeTransaction } from "@/lib/solana";
 import { Loader2, Plus, Unplug, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState } from "@/components/error-state";
 
 export default function StakingPage() {
-  const { connected, publicKey, signTransaction, sendTransaction } = useWallet();
+  const { connected, publicKey, sendTransaction } = useWallet();
   const wallet = publicKey?.toBase58() ?? "";
   const [bondAmount, setBondAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,16 +30,14 @@ export default function StakingPage() {
   const bondMutation = useMutation({
     mutationFn: () => api.stakingBond(wallet, Number(bondAmount)),
     onSuccess: async (data) => {
-      if (!signTransaction || !sendTransaction) {
-        setError("Wallet does not support signing transactions.");
+      if (!sendTransaction) {
+        setError("Wallet does not support sending transactions.");
         return;
       }
       try {
-        const txBuffer = Buffer.from((data as { transaction: string }).transaction, "base64");
-        const transaction = Transaction.from(txBuffer);
-        const signed = await signTransaction(transaction);
+        const transaction = decodeTransaction((data as { transaction: string }).transaction);
         const connection = new Connection("https://api.devnet.solana.com");
-        await sendTransaction(signed, connection);
+        await sendTransaction(transaction, connection);
         setError(null);
         setBondAmount("");
         bondStatusQuery.refetch();
@@ -52,16 +51,14 @@ export default function StakingPage() {
   const unbondMutation = useMutation({
     mutationFn: () => api.stakingUnbond(wallet),
     onSuccess: async (data) => {
-      if (!signTransaction || !sendTransaction) {
-        setError("Wallet does not support signing transactions.");
+      if (!sendTransaction) {
+        setError("Wallet does not support sending transactions.");
         return;
       }
       try {
-        const txBuffer = Buffer.from((data as { transaction: string }).transaction, "base64");
-        const transaction = Transaction.from(txBuffer);
-        const signed = await signTransaction(transaction);
+        const transaction = decodeTransaction((data as { transaction: string }).transaction);
         const connection = new Connection("https://api.devnet.solana.com");
-        await sendTransaction(signed, connection);
+        await sendTransaction(transaction, connection);
         setError(null);
         bondStatusQuery.refetch();
       } catch (err) {
@@ -74,16 +71,14 @@ export default function StakingPage() {
   const claimMutation = useMutation({
     mutationFn: () => api.stakingClaim(wallet),
     onSuccess: async (data) => {
-      if (!signTransaction || !sendTransaction) {
-        setError("Wallet does not support signing transactions.");
+      if (!sendTransaction) {
+        setError("Wallet does not support sending transactions.");
         return;
       }
       try {
-        const txBuffer = Buffer.from((data as { transaction: string }).transaction, "base64");
-        const transaction = Transaction.from(txBuffer);
-        const signed = await signTransaction(transaction);
+        const transaction = decodeTransaction((data as { transaction: string }).transaction);
         const connection = new Connection("https://api.devnet.solana.com");
-        await sendTransaction(signed, connection);
+        await sendTransaction(transaction, connection);
         setError(null);
         bondStatusQuery.refetch();
       } catch (err) {

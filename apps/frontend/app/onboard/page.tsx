@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Connection, Transaction } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
+import { decodeTransaction } from "@/lib/solana";
 import { ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -17,7 +18,7 @@ import { ErrorState } from "@/components/error-state";
 const STEPS = ["Connect", "Bond", "Register", "Complete"] as const;
 
 export default function OnboardPage() {
-  const { connected, publicKey, signTransaction, sendTransaction } = useWallet();
+  const { connected, publicKey, sendTransaction } = useWallet();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<(typeof STEPS)[number]>("Connect");
   const [managerName, setManagerName] = useState("");
@@ -35,16 +36,14 @@ export default function OnboardPage() {
   const bondMutation = useMutation({
     mutationFn: () => api.stakingBond(wallet, Number(bondAmount)),
     onSuccess: async (data) => {
-      if (!signTransaction || !sendTransaction) {
-        setError("Wallet does not support signing transactions.");
+      if (!sendTransaction) {
+        setError("Wallet does not support sending transactions.");
         return;
       }
       try {
-        const txBuffer = Buffer.from(data.transaction, "base64");
-        const transaction = Transaction.from(txBuffer);
-        const signed = await signTransaction(transaction);
+        const transaction = decodeTransaction(data.transaction);
         const connection = new Connection("https://api.devnet.solana.com");
-        await sendTransaction(signed, connection);
+        await sendTransaction(transaction, connection);
         setError(null);
         setStep("Register");
       } catch (err) {

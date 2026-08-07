@@ -43,6 +43,7 @@ FROM strategy-sdk-builder AS backend
 ENV NODE_ENV=production
 WORKDIR /app
 COPY apps/backend apps/backend
+COPY --from=strategy-sdk-builder /app/packages/strategy-sdk/dist ./packages/strategy-sdk/dist
 RUN pnpm --filter atlas-backend build
 RUN pnpm install --prod --frozen-lockfile $PNPM_FLAGS --filter atlas-backend --ignore-scripts
 EXPOSE 8080

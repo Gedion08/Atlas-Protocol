@@ -11,6 +11,7 @@ COPY apps/frontend/package.json apps/frontend/package.json
 COPY apps/backend/package.json apps/backend/package.json
 COPY packages/types/package.json packages/types/package.json
 COPY packages/strategy-sdk/package.json packages/strategy-sdk/package.json
+COPY packages/strategy-sdk packages/strategy-sdk
 RUN pnpm install --frozen-lockfile $PNPM_FLAGS --filter atlas-frontend --filter atlas-backend --filter atlas-types --filter strategy-sdk
 
 FROM deps AS types-builder
@@ -43,7 +44,6 @@ FROM strategy-sdk-builder AS backend
 ENV NODE_ENV=production
 WORKDIR /app
 COPY apps/backend apps/backend
-COPY --from=strategy-sdk-builder /app/packages/strategy-sdk/dist ./packages/strategy-sdk/dist
 RUN pnpm --filter atlas-backend build
 RUN pnpm install --prod --frozen-lockfile $PNPM_FLAGS --filter atlas-backend --ignore-scripts
 EXPOSE 8080

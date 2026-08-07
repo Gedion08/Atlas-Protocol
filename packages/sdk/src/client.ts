@@ -7,6 +7,7 @@ import type {
   ManagerProfile,
   RiskDecision,
   Strategy,
+  StrategyProtocol,
   StrategyType,
   StrategyUpload,
   Vault,
@@ -125,12 +126,12 @@ export class AtlasClient {
     });
   }
 
-  validateStrategyParams(type: string, params?: Record<string, unknown>) {
-    return validateStrategyParams(type as StrategyType, params);
+  validateStrategyParams(type: string, protocol: StrategyProtocol | "default", params?: Record<string, unknown>) {
+    return validateStrategyParams(type as StrategyType, protocol, params);
   }
 
-  getStrategySchema(type: string) {
-    return getStrategySchema(type as StrategyType);
+  getStrategySchema(type: string, protocol: StrategyProtocol | "default") {
+    return getStrategySchema(type as StrategyType, protocol);
   }
 
   listStrategyTypes() {

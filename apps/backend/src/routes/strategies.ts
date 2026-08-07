@@ -130,7 +130,7 @@ export async function registerStrategyRoutes(
 
       // Strategy SDK validation (roadmap §Phase 3): validate params against the
       // per-strategy-type schema; normalize defaults and reject unknown fields.
-      const validation = validateStrategyParams(upload.type, upload.params);
+      const validation = validateStrategyParams(upload.type, upload.protocol, upload.params);
       if (!validation.ok) {
         return reply.status(400).send({
           error: "invalid_strategy_params",

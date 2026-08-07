@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/error-state";
 import { StrategyCardSkeleton } from "@/components/skeletons/strategy-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StrategyUploadForm } from "@/components/strategy-upload-form";
+import { StrategyUploadWizard } from "@/components/strategy-upload-wizard";
 
 const filters = [
   "all",
@@ -82,7 +82,7 @@ export default function StrategiesPage() {
         )}
       </div>
 
-      <StrategyUploadForm managers={managers ?? []} />
+      <StrategyUploadWizard managers={managers ?? []} />
 
       {strategiesQuery.isLoading && !strategies ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -10,11 +10,16 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY apps/frontend/package.json apps/frontend/package.json
 COPY apps/backend/package.json apps/backend/package.json
 COPY packages/types/package.json packages/types/package.json
-RUN pnpm install --frozen-lockfile $PNPM_FLAGS --filter atlas-frontend --filter atlas-backend --filter atlas-types
+COPY packages/strategy-sdk/package.json packages/strategy-sdk/package.json
+RUN pnpm install --frozen-lockfile $PNPM_FLAGS --filter atlas-frontend --filter atlas-backend --filter atlas-types --filter strategy-sdk
 
 FROM deps AS types-builder
 COPY packages/types packages/types
 RUN pnpm --filter atlas-types build
+
+FROM types-builder AS strategy-sdk-builder
+COPY packages/strategy-sdk packages/strategy-sdk
+RUN pnpm --filter strategy-sdk build
 
 FROM types-builder AS frontend-builder
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080
@@ -34,7 +39,7 @@ EXPOSE 3000
 USER node
 CMD ["node", "apps/frontend/server.js"]
 
-FROM types-builder AS backend
+FROM strategy-sdk-builder AS backend
 ENV NODE_ENV=production
 WORKDIR /app
 COPY apps/backend apps/backend

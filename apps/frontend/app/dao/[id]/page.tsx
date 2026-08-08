@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { ArrowLeft, Vote } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
@@ -26,6 +27,8 @@ export default function ProposalDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { publicKey } = useWallet();
+  const wallet = publicKey?.toBase58() ?? "";
   const [selectedVote, setSelectedVote] = useState<"for" | "against" | null>(null);
   const [voting, setVoting] = useState(false);
 
@@ -49,22 +52,21 @@ export default function ProposalDetailPage() {
 
   const canVote = resolved?.status === "active";
   const display = resolved ?? proposal;
-  if (!display) throw new Error("unreachable");
-  const params_ = classParams(display.class);
-  const quorumReached = display.forVotes + display.againstVotes >= (display.quorumWeight || 0);
-  const totalCast = display.forVotes + display.againstVotes;
-  const passagePct = totalCast > 0 ? (display.forVotes / totalCast) * 100 : 0;
-  const quorumPct = display.quorumWeight > 0 ? (totalCast / display.quorumWeight) * 100 : 0;
+  const params_ = display ? classParams(display.class) : undefined;
+  const quorumReached = display ? display.forVotes + display.againstVotes >= (display.quorumWeight || 0) : false;
+  const totalCast = display ? display.forVotes + display.againstVotes : 0;
+  const passagePct = totalCast > 0 ? (display!.forVotes / totalCast) * 100 : 0;
+  const quorumPct = display && display.quorumWeight > 0 ? (totalCast / display.quorumWeight) * 100 : 0;
 
   const [executing, setExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<{ signature: string } | null>(null);
   const now = Math.floor(Date.now() / 1000);
 
   async function handleVote(inFavor: boolean) {
-    if (!display || !canVote) return;
+    if (!display || !canVote || !wallet) return;
     setVoting(true);
     try {
-      await api.castVote(display.id, { voter: "", inFavor });
+      await api.castVote(display.id, { voter: wallet, inFavor });
       queryClient.invalidateQueries({ queryKey: ["proposal", params.id] });
       queryClient.invalidateQueries({ queryKey: ["proposals"] });
     } finally {
@@ -85,6 +87,30 @@ export default function ProposalDetailPage() {
     } finally {
       setExecuting(false);
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-48 animate-pulse rounded bg-muted/40" />
+        <div className="h-64 animate-pulse rounded-2xl border bg-muted/40" />
+      </div>
+    );
+  }
+
+  if (error || !display) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        </Button>
+        <Card>
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            {error ? "Failed to load proposal." : "Proposal not found."}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (isLoading) {
@@ -199,19 +225,24 @@ export default function ProposalDetailPage() {
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <Button
                 variant={selectedVote === "for" ? "default" : "outline"}
-                disabled={voting}
+                disabled={voting || !wallet}
                 onClick={() => handleVote(true)}
               >
                 <Vote className="mr-2 h-4 w-4" /> Vote For
               </Button>
               <Button
                 variant={selectedVote === "against" ? "destructive" : "outline"}
-                disabled={voting}
+                disabled={voting || !wallet}
                 onClick={() => handleVote(false)}
               >
                 <Vote className="mr-2 h-4 w-4" /> Vote Against
               </Button>
               {voting && <span className="text-sm text-muted-foreground">Submitting…</span>}
+              {!wallet && (
+                <span className="text-xs text-muted-foreground">
+                  Connect a wallet to vote.
+                </span>
+              )}
             </div>
           )}
 

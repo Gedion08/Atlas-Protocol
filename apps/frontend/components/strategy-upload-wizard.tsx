@@ -473,7 +473,7 @@ export function StrategyUploadWizard({ managers }: Props) {
               {mutation.isError && <Badge variant="destructive">{mutation.error.message}</Badge>}
               {mutation.isSuccess && <Badge variant="positive">Uploaded v{mutation.data.version}</Badge>}
               {step < 4 ? (
-                <Button type="button" disabled={step === 1 ? !canProceedStep1() : step === 2 ? !canProceedStep2() : !canProceedStep3()}>
+                <Button type="button" onClick={() => setStep((s) => (s + 1) as Step)} disabled={step === 1 ? !canProceedStep1() : step === 2 ? !canProceedStep2() : !canProceedStep3()}>
                   Next
                 </Button>
               ) : (

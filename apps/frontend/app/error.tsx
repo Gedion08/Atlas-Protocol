@@ -11,21 +11,19 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html lang="en">
-      <body className="flex min-h-screen items-center justify-center bg-background p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Something went wrong</CardTitle>
-            <CardDescription>
-              An unexpected error occurred. The incident has been logged
-              {error.digest ? ` (ref ${error.digest})` : ""}.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={reset}>Try again</Button>
-          </CardContent>
-        </Card>
-      </body>
-    </html>
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Something went wrong</CardTitle>
+          <CardDescription>
+            An unexpected error occurred. The incident has been logged
+            {error.digest ? ` (ref ${error.digest})` : ""}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={reset}>Try again</Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

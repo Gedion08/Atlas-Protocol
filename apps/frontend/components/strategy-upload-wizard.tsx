@@ -46,13 +46,11 @@ type Step = 1 | 2 | 3 | 4;
 export function StrategyUploadWizard({ managers }: Props) {
   const queryClient = useQueryClient();
   const { connected, publicKey, signMessage } = useWallet();
-  const [step, setStep] = useState<Step>(1);
-  const [error, setError] = useState<string | null>(null);
 
   const activeManagers = managers.filter((m) => m.status === "active");
-  const selectedManager = activeManagers.find((m) => m.id === managerId);
-  const walletCanSign = connected && publicKey !== null && typeof signMessage === "function";
 
+  const [step, setStep] = useState<Step>(1);
+  const [error, setError] = useState<string | null>(null);
   const [managerId, setManagerId] = useState(activeManagers[0]?.id ?? "");
   const [name, setName] = useState("");
   const [type, setType] = useState<StrategyType>("passive");
@@ -71,6 +69,9 @@ export function StrategyUploadWizard({ managers }: Props) {
   const [signing, setSigning] = useState(false);
   const [nonce, setNonce] = useState("");
   const [messageToSign, setMessageToSign] = useState("");
+
+  const selectedManager = activeManagers.find((m) => m.id === managerId);
+  const walletCanSign = connected && publicKey !== null && typeof signMessage === "function";
 
   const paramFields = useMemo(() => {
     const typeMap = STRATEGY_PARAMS[type];

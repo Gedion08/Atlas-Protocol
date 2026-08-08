@@ -1,6 +1,7 @@
 .next/
 node_modules/
 dist/
+apps/backend/dist/
 target/
 coverage/
 pnpm-lock.yaml

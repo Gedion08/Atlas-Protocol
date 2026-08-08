@@ -60,6 +60,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter atlas-types build
+      - run: pnpm --filter atlas-backend lint
       - run: pnpm --filter atlas-backend typecheck
       - run: pnpm --filter atlas-backend test:coverage
       - run: pnpm --filter atlas-backend build
@@ -73,7 +74,7 @@ jobs:
           pnpm --filter atlas-backend test:integration
 
   programs:
-    name: Solana programs (clippy, test, build)
+    name: Solana programs (clippy, test, build, types)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -86,7 +87,15 @@ jobs:
           components: clippy
       - run: cargo clippy --workspace -- -D warnings
       - run: cargo test --workspace
-      - run: cargo build --workspace
+      - run: cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked
+      - run: anchor build
+      - run: |
+          for prog in atlas_vault atlas_manager_registry atlas_staking atlas_governance atlas_treasury; do
+            if [ ! -d "target/types/${prog}" ]; then
+              echo "::error::Missing target/types/${prog}"
+              exit 1
+            fi
+          done
 
   docker:
     name: Docker images

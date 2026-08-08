@@ -1,112 +1,201 @@
 # Atlas Protocol
 
-Atlas Protocol is a pnpm monorepo for a Solana-native liquidity allocation system.
-The workspace combines Rust Anchor programs, a Fastify backend, and a Next.js frontend.
+**The decentralized operating system for professional liquidity providers on Solana.**
 
-## What lives in this repo
+Atlas Protocol is a production-grade liquidity allocation system that connects capital with verified LP managers through on-chain transparency, automated risk monitoring, and governance-controlled parameters. The protocol combines Anchor Rust programs, a Fastify backend, and a Next.js frontend into a unified pnpm workspace.
 
-- `programs/` — Anchor programs for vault, manager registry, staking, treasury, and governance.
-- `apps/backend/` — Fastify API, Solana submitter, risk engine, scoring, allocation, indexer, and oracle services.
-- `apps/frontend/` — Next.js 15 dashboard and wallet UX.
-- `packages/types/` — shared TypeScript domain models.
-- `deploy/` — deployment, keypair, and init automation for Solana devnet configuration.
-- `docs/` — architecture and protocol design references.
+## Architecture
 
-## Current stack
+```
+                  Investors
+                      │
+                      ▼
+              Capital Vault Layer
+                      │
+                      ▼
+          Dynamic Allocation Engine
+                      │
+       ┌──────────────┼───────────────┐
+       ▼              ▼               ▼
+  Manager A      Manager B      Manager C
+       │              ▼               │
+       ▼            ▼                ▼
+  Meteora DLMM   Orca CLMM      Raydium CLMM
+       │            │                │
+       └────────────┼───────────────┘
+                    ▼
+         Risk Monitoring Engine
+                    ▼
+        Performance Oracle Layer
+                    ▼
+           Capital Reallocation
+```
 
-- Rust + Anchor
-- TypeScript + pnpm workspaces
-- Fastify backend
-- Next.js frontend
-- Solana devnet deployment scripts
+## Components
 
-## Local development
+### On-chain (Anchor programs)
 
-### Prerequisites
+| Program            | Responsibility                                                                 |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `vault`            | Vault state, deposits (mint shares), withdrawals (burn shares), fee settlement, emergency exit, rebalance |
+| `manager-registry` | Manager profiles (PDA per owner), on-chain weighted score with validated 0-100 components, status lifecycle (active/suspended/banned) |
+| `staking`          | Bonding escrow (PDA token account), unbond with cooldown, claim, slashing by slash authority to insurance escrow |
+| `governance`       | Token voting, proposal system, risk parameter voting, manager onboarding, veATLAS locks |
+| `treasury`         | Protocol treasury management, fee collection, rollover periods |
+
+### Backend services (TypeScript, Fastify)
+
+- **Scoring** — Weighted reputation formula (fee generation, risk, drawdown, consistency, TVL growth, governance participation), pure functions, fully unit tested.
+- **Risk engine** — Daily returns, VaR (historical), expected shortfall, max drawdown, concentration metrics, risk rule evaluation with `ok | reduce | pause` decisions.
+- **Allocation engine** — Raw weight from score/risk/fee-efficiency/consistency/volatility/track record, iterative cap enforcement (max 30%/manager, 10% cash reserve), drift detection for reallocation.
+- **Indexer** — Helius webhook normalization + event bus (in-memory or Kafka).
+- **Oracle** — M-of-N oracle set for NAV marks; median of signed feeds with max-value-move bounds.
+- **Circuit breaker** — Automated evaluation of manager NAV series against the risk engine; submits `set_status(Suspended)` via governance keypair.
+- **API** — REST under `/api/v1` (vaults, managers, strategies, leaderboard, score computation, governance), WebSocket `/ws/feed`, Helius webhook intake at `/webhooks/helius`.
+
+### Data stores
+
+- PostgreSQL: relational core (managers, strategies, vaults, allocations, risk decisions, risk rules).
+- ClickHouse: time-series performance snapshots, transactions, Meteora bin analytics.
+- Redis/Kafka: events, queues.
+
+### Frontend (Next.js 15 + Tailwind 4 + TanStack Query)
+
+- `/` — Investor dashboard (TVL, weighted APY, NAV chart, allocation, top managers)
+- `/invest` — Deposit and withdraw from vaults
+- `/strategies` — Strategy marketplace with protocol filters and risk-tier gating
+- `/leaderboard` — Manager rankings by on-chain weighted score
+- `/manager/[id]` — Manager profile (score breakdown, track record, strategies)
+- `/protocol` — Risk rules, protocol narrative, and governance participation
+- `/governance` — Proposals, voting, and veATLAS lock management
+
+## Security
+
+Atlas Protocol is designed with defense-in-depth for on-chain capital flows:
+
+- **PDA-based account constraints** with canonical seeds; all token authorities are PDAs
+- **M-of-N oracle set** for NAV marks (median of >=3 signatures, max-value-move bounds)
+- **Escrow patterns** for vault deposits, bonds, and fees
+- **Governance-gated parameter changes** — no single key can alter protocol parameters
+- **Auto-suspend on low scores** — circuit breaker evaluates risk continuously and pauses managers automatically
+- **Wallet-signature authentication** with nonce replay protection for privileged API calls
+- **Helius webhook signature verification** for event intake
+- **Zod-validated environment** — invalid configuration crashes startup rather than running unsafe
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and the full security policy.
+
+## Prerequisites
 
 - Node.js 20+
 - pnpm 11+
 - Rust + Cargo
 - Anchor CLI 0.30.1
+- PostgreSQL 16 (production)
 
-### Install workspace dependencies
+## Quick start
 
 ```bash
+# Install dependencies
 pnpm install
-```
 
-### Common commands
-
-```bash
-pnpm build
-pnpm test
-pnpm typecheck
-pnpm --filter atlas-backend test
-pnpm --filter atlas-frontend test
-pnpm --filter atlas-frontend lint
+# Build shared types (required before backend/frontend)
 pnpm --filter atlas-types build
-pnpm --filter atlas-sdk build
-```
 
-### Run the apps
+# Run type checking across the workspace
+pnpm typecheck
 
-```bash
+# Run all tests
+pnpm test
+
+# Run backend tests with coverage
+pnpm --filter atlas-backend test:coverage
+
+# Run frontend lint + tests
+pnpm --filter atlas-frontend lint
+pnpm --filter atlas-frontend test
+
+# Start development servers
 pnpm dev:backend
 pnpm dev:frontend
 ```
 
-### Build and test the Rust programs
+## Build and test Rust programs
 
 ```bash
-anchor build
-anchor test
+cargo clippy --workspace --manifest-path programs/Cargo.toml -- -D warnings
+cargo test --workspace --manifest-path programs/Cargo.toml
+cargo build --workspace --manifest-path programs/Cargo.toml
 ```
 
-## Deploying on Solana devnet
+## Database migrations
 
-The deployment workflow lives in `deploy/`.
-The repo expects the Anchor programs to be deployed first, then the on-chain configuration to be initialized with the generated program IDs.
+```bash
+pnpm db:migrate    # apply pending SQL migrations
+pnpm db:seed       # seed demo data (development only)
+```
 
-### Current devnet program IDs
+## Deployment
 
-These are the addresses recorded in the repo’s deployment artifact:
+The deployment workflow lives in `deploy/`. Programs are deployed to Solana devnet, followed by on-chain configuration initialization.
 
-- Vault: `BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR`
-- Manager Registry: `CgLpJydFMSrkAHLjhmEZX3pFF4M5BC8CY36ajBe2bvTs`
-- Staking: `4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H`
-- Governance: `5fcfpz4DK8G4HbPMyX259fgotXJaE4v7yNhXidRAtWnD`
-- Treasury: `86pSPBBGKzMXteNGjxPT8XSt3fjuZGRMVMnEhQpWiefS`
+### Devnet program IDs
 
-For Render-backed backend runtime configuration, the backend uses `ATLAS_REGISTRY_PROGRAM_ID` as the main Solana program reference.
-See `apps/backend/src/env.ts` for the environment contract.
+| Program | Address |
+|---------|---------|
+| Vault | `BeEtwSTYjPs47ZWa4joMppCNdJs4f4GRumCRtKXfSfSR` |
+| Manager Registry | `CgLpJydFMSrkAHLjhmEZX3pFF4M5BC8CY36ajBe2bvTs` |
+| Staking | `4PxMwLR7KimbQct4NYXyjVk42aMK4vrKcBobBGepjJ4H` |
+| Governance | `5fcfpz4DK8G4HbPMyX259fgotXJaE4v7yNhXidRAtWnD` |
+| Treasury | `86pSPBBGKzMXteNGjxPT8XSt3fjuZGRMVMnEhQpWiefS` |
 
-## Backend environment notes
+### Environment variables
 
-The backend reads its runtime settings from `apps/backend/src/env.ts`.
-The key values you typically need in deployment are:
+Key backend environment variables:
 
-- `REPOSITORY_DRIVER` — `memory` for local dev (default) or `postgres` for production
-- `DATABASE_URL` — Postgres/Supabase connection string (`sslmode=require` auto-detected)
-- `DB_AUTO_MIGRATE` — apply pending SQL migrations on backend startup (default `true`)
-- `DB_AUTO_SEED` — seed demo data on startup when the database is empty (default `true`)
-- `ATLAS_REGISTRY_PROGRAM_ID`
-- `SOLANA_RPC_URL`
-- `ORACLE_KEYPAIR` when enabling oracle submission
-- `GOVERNANCE_KEYPAIR` when enabling circuit-breaker submission
+| Variable | Description |
+|----------|-------------|
+| `NODE_ENV` | `development`, `test`, or `production` |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REPOSITORY_DRIVER` | `memory` (dev) or `postgres` (production) |
+| `DB_AUTO_MIGRATE` | Apply migrations on startup (default: `true`) |
+| `DB_AUTO_SEED` | Seed demo data when DB is empty (default: `false`) |
+| `SOLANA_RPC_URL` | Solana RPC endpoint |
+| `ATLAS_REGISTRY_PROGRAM_ID` | Manager registry program ID |
+| `ATLAS_VAULT_PROGRAM_ID` | Vault program ID |
+| `ATLAS_GOVERNANCE_PROGRAM_ID` | Governance program ID |
+| `ORACLE_KEYPAIR` | Oracle signer keypair (JSON array) |
+| `GOVERNANCE_KEYPAIR` | Governance/circuit-breaker keypair (JSON array) |
+| `HELIUS_WEBHOOK_SECRET` | Helius webhook verification secret |
 
-Solana keypairs (`ORACLE_KEYPAIR`, `GOVERNANCE_KEYPAIR`, and the `deploy/*.json` devnet
-wallets) are secrets: inject them via environment variables / secret managers, never
-commit them. The `deploy/deployer.json` and `deploy/oracle*.json` files are gitignored.
+## Documentation
 
-## Documentation map
+- `docs/architecture.md` — System architecture and account/data flow
+- `docs/risk-engine.md` — Risk engine model, thresholds, and safeguards
+- `docs/manager-score.md` — Manager score calculation and manipulation resistance
+- `docs/protocol-economics.md` — Protocol economics and token flow
+- `docs/roadmap.md` — Delivery roadmap
 
-- `docs/architecture.md` — system architecture and account/data flow
-- `docs/risk-engine.md` — risk engine model, thresholds, and safeguards
-- `docs/manager-score.md` — manager score calculation
-- `docs/protocol-economics.md` — protocol economics and token flow
-- `docs/roadmap.md` — delivery roadmap
+## Repository layout
 
-## Repository hygiene
+```
+programs/            Anchor Rust workspace (vault, manager-registry, staking, governance, treasury)
+apps/backend/        Fastify API, Solana services, risk engine, scoring, allocation, indexer, oracle
+apps/frontend/       Next.js 15 dashboard and wallet UX
+packages/types/      Shared TypeScript domain models (atlas-types)
+packages/sdk/        Typed client over the backend API (atlas-sdk)
+deploy/              Deployment automation, keypair generation, on-chain initialization
+docs/                Architecture, risk engine, manager score, protocol economics, roadmap
+```
 
-A few local-only installer and environment helper files are not part of the source-of-truth project workflow and should stay out of version-control commits.
-The checked-in repo is organized to keep the runtime workspace, generated build artifacts, and local toolchain files out of the Git history.
+## Contributing
+
+We follow conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`). Before submitting:
+
+1. Run `pnpm typecheck`
+2. Run `pnpm test`
+3. Run `cargo clippy --workspace --manifest-path programs/Cargo.toml -- -D warnings`
+4. Ensure frontend lint passes: `pnpm --filter atlas-frontend lint`
+
+## License
+
+MIT

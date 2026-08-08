@@ -9,15 +9,16 @@ import {
   buildExecuteProposalTransaction,
 } from "../services/governance/solana.js";
 import { Connection, Keypair, sendAndConfirmTransaction } from "@solana/web3.js";
+import { requireWalletSignature, NonceStore } from "../services/auth/signature.js";
 
 const executeBody = z.object({
   proposalId: z.string().min(1),
-  executor: z.string().min(1),
 });
 
 export async function registerGovernanceExecutionRoutes(
   app: FastifyInstance,
   repos: Repositories,
+  nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
   app.post(
     "/api/v1/governance/proposals/:id/execute",
@@ -48,30 +49,39 @@ export async function registerGovernanceExecutionRoutes(
         });
       }
 
-      const [configPda] = governanceConfigPda(GOVERNANCE_PROGRAM_ID);
-      const [proposalPdaKey] = proposalPda(configPda, BigInt(id), GOVERNANCE_PROGRAM_ID);
-
-      let executorKeypair: Keypair | null = null;
-      if (env.GOVERNANCE_KEYPAIR) {
-        try {
-          const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR));
-          executorKeypair = Keypair.fromSecretKey(secret);
-        } catch {
-          return reply.status(400).send({
-            error: "invalid_keypair",
-            message: "Invalid GOVERNANCE_KEYPAIR format",
-            statusCode: 400,
-          });
-        }
-      }
-
-      if (!executorKeypair || executorKeypair.publicKey.toBase58() !== body.executor) {
-        return reply.status(403).send({
-          error: "unauthorized_executor",
-          message: "Executor does not match configured governance keypair",
-          statusCode: 403,
+      let executorKeypair: Keypair;
+      if (!env.GOVERNANCE_KEYPAIR) {
+        return reply.status(500).send({
+          error: "governance_keypair_missing",
+          message: "GOVERNANCE_KEYPAIR is not configured",
+          statusCode: 500,
         });
       }
+      try {
+        const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]);
+        executorKeypair = Keypair.fromSecretKey(secret);
+      } catch {
+        return reply.status(400).send({
+          error: "invalid_keypair",
+          message: "Invalid GOVERNANCE_KEYPAIR format",
+          statusCode: 400,
+        });
+      }
+
+      const auth = requireWalletSignature({
+        nonces,
+        ownerHeader: request.headers["x-atlas-owner"] as string | undefined,
+        nonceHeader: request.headers["x-atlas-nonce"] as string | undefined,
+        signatureHeader: request.headers["x-atlas-signature"] as string | undefined,
+        body: request.body,
+        expectedOwner: executorKeypair.publicKey.toBase58(),
+      });
+      if (!auth.ok) {
+        return reply.status(auth.statusCode ?? 401).send(auth);
+      }
+
+      const [configPda] = governanceConfigPda(GOVERNANCE_PROGRAM_ID);
+      const [proposalPdaKey] = proposalPda(configPda, BigInt(id), GOVERNANCE_PROGRAM_ID);
 
       const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
       const tx = await buildExecuteProposalTransaction({

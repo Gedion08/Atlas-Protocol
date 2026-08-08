@@ -4,10 +4,10 @@ import type { Repositories } from "../db/repositories.js";
 import { env } from "../env.js";
 import { EmergencyExitService } from "../services/emergency-exit/index.js";
 import { VaultClient } from "../services/vault/index.js";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { Connection, Keypair } from "@solana/web3.js";
+import { requireWalletSignature, NonceStore } from "../services/auth/signature.js";
 
 const emergencyExitBody = z.object({
-  executor: z.string().min(1),
   vaultAddress: z.string().min(1),
 });
 
@@ -15,6 +15,7 @@ export async function registerEmergencyExitRoutes(
   app: FastifyInstance,
   repos: Repositories,
   vaultClient: VaultClient,
+  nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
   app.post(
     "/api/v1/emergency-exit",
@@ -22,26 +23,35 @@ export async function registerEmergencyExitRoutes(
     async (request, reply) => {
       const body = emergencyExitBody.parse(request.body);
 
-      let executorKeypair: Keypair | null = null;
-      if (env.GOVERNANCE_KEYPAIR) {
-        try {
-          const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR));
-          executorKeypair = Keypair.fromSecretKey(secret);
-        } catch {
-          return reply.status(400).send({
-            error: "invalid_keypair",
-            message: "Invalid GOVERNANCE_KEYPAIR format",
-            statusCode: 400,
-          });
-        }
+      let executorKeypair: Keypair;
+      if (!env.GOVERNANCE_KEYPAIR) {
+        return reply.status(500).send({
+          error: "governance_keypair_missing",
+          message: "GOVERNANCE_KEYPAIR is not configured",
+          statusCode: 500,
+        });
+      }
+      try {
+        const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]);
+        executorKeypair = Keypair.fromSecretKey(secret);
+      } catch {
+        return reply.status(400).send({
+          error: "invalid_keypair",
+          message: "Invalid GOVERNANCE_KEYPAIR format",
+          statusCode: 400,
+        });
       }
 
-      if (!executorKeypair || executorKeypair.publicKey.toBase58() !== body.executor) {
-        return reply.status(403).send({
-          error: "unauthorized_executor",
-          message: "Executor does not match configured governance keypair",
-          statusCode: 403,
-        });
+      const auth = requireWalletSignature({
+        nonces,
+        ownerHeader: request.headers["x-atlas-owner"] as string | undefined,
+        nonceHeader: request.headers["x-atlas-nonce"] as string | undefined,
+        signatureHeader: request.headers["x-atlas-signature"] as string | undefined,
+        body: request.body,
+        expectedOwner: executorKeypair.publicKey.toBase58(),
+      });
+      if (!auth.ok) {
+        return reply.status(auth.statusCode ?? 401).send(auth);
       }
 
       const vault = await repos.vaults.get(body.vaultAddress);

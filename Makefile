@@ -25,8 +25,9 @@ test: ## Run all tests (vitest + cargo)
 typecheck: ## Type-check all TypeScript workspaces
 	pnpm typecheck
 
-lint: ## Lint the frontend
+lint: ## Lint frontend and backend
 	pnpm --filter atlas-frontend lint
+	pnpm --filter atlas-backend lint
 
 programs: ## Compile Solana programs (requires cargo)
 	cargo build --workspace --manifest-path programs/Cargo.toml

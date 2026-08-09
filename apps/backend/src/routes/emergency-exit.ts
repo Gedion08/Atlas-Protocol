@@ -6,7 +6,7 @@ import { EmergencyExitService } from "../services/emergency-exit/index.js";
 import { VaultClient } from "../services/vault/index.js";
 import { Connection, Keypair } from "@solana/web3.js";
 import { requireWalletSignature, NonceStore } from "../services/auth/signature.js";
-import { withRateLimit } from "../plugins/security.js";
+import { createRateLimit } from "../plugins/security.js";
 
 const emergencyExitBody = z.object({
   vaultAddress: z.string().min(1),
@@ -19,9 +19,12 @@ export async function registerEmergencyExitRoutes(
   governanceKeypair?: Keypair,
   nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
-  const route = app.post(
+  app.post(
     "/api/v1/emergency-exit",
-    { schema: { tags: ["emergency"] } },
+    {
+      schema: { tags: ["emergency"] },
+      preHandler: [createRateLimit(5, 60_000)],
+    },
     async (request, reply) => {
       const body = emergencyExitBody.parse(request.body);
 
@@ -82,6 +85,4 @@ export async function registerEmergencyExitRoutes(
       });
     },
   );
-
-  withRateLimit(route, 5, "1 minute");
 }

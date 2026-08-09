@@ -10,7 +10,7 @@ import {
 } from "../services/governance/solana.js";
 import { Connection, Keypair, sendAndConfirmTransaction } from "@solana/web3.js";
 import { requireWalletSignature, NonceStore } from "../services/auth/signature.js";
-import { withRateLimit } from "../plugins/security.js";
+import { createRateLimit } from "../plugins/security.js";
 
 const executeBody = z.object({
   proposalId: z.string().min(1),
@@ -22,9 +22,12 @@ export async function registerGovernanceExecutionRoutes(
   governanceKeypair?: Keypair,
   nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
-  const route = app.post(
+  app.post(
     "/api/v1/governance/proposals/:id/execute",
-    { schema: { tags: ["governance"] } },
+    {
+      schema: { tags: ["governance"] },
+      preHandler: [createRateLimit(5, 60_000)],
+    },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       executeBody.parse(request.body);
@@ -110,6 +113,4 @@ export async function registerGovernanceExecutionRoutes(
       }
     },
   );
-
-  withRateLimit(route, 5, "1 minute");
 }

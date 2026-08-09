@@ -43,25 +43,18 @@ export async function registerSecurity(app: FastifyInstance): Promise<void> {
   });
 }
 
-export function withRateLimit(
-  route: Record<string, unknown>,
-  max: number,
-  timeWindow: string,
-): void {
-  const existing = route.options.preHandler as unknown[] | undefined;
-  const handler = async (request: { ip: string }, reply: { status: (code: number) => { send: (body: unknown) => void } }) => {
-    const key = `${request.ip}:${route.options.schema?.tags?.[0] ?? "unknown"}`;
+export function createRateLimit(max: number, timeWindowMs: number) {
+  const store = new Map<string, { count: number; resetAt: number }>();
+  return async (request: { ip: string }, reply: { status: (code: number) => { send: (body: unknown) => void } }) => {
+    const key = request.ip;
     const now = Date.now();
-    const windowMs = parseTimeWindow(timeWindow);
-    const store = (route as unknown as { _rateLimitStore?: Map<string, { count: number; resetAt: number }> })._rateLimitStore ?? new Map();
-    (route as unknown as { _rateLimitStore?: Map<string, { count: number; resetAt: number }> })._rateLimitStore = store;
     const entry = store.get(key);
     if (!entry || now > entry.resetAt) {
-      store.set(key, { count: 1, resetAt: now + windowMs });
+      store.set(key, { count: 1, resetAt: now + timeWindowMs });
     } else if (entry.count >= max) {
       reply.status(429).send({
         error: "too_many_requests",
-        message: `Rate limit exceeded: ${max} requests per ${timeWindow}`,
+        message: `Rate limit exceeded: ${max} requests per ${timeWindowMs}ms`,
         statusCode: 429,
       });
       return;
@@ -69,11 +62,4 @@ export function withRateLimit(
       entry.count += 1;
     }
   };
-  route.options.preHandler = existing ? [...existing, handler] : [handler];
-}
-
-function parseTimeWindow(window: string): number {
-  if (window.endsWith(" minute")) return Number(window.split(" ")[0]) * 60_000;
-  if (window.endsWith(" second")) return Number(window.split(" ")[0]) * 1_000;
-  return 60_000;
 }

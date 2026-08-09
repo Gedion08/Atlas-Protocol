@@ -52,6 +52,7 @@ export interface BuildAppOptions {
   timeSeries?: TimeSeriesStore;
   vaultClient?: VaultClient;
   dlmmStore?: DlmmAnalyticsStore;
+  governanceKeypair?: Keypair;
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -66,6 +67,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     bodyLimit: 1_048_576,
   });
   const serverUrl = `http://${env.HOST === "0.0.0.0" ? "localhost" : env.HOST}:${env.BACKEND_PORT}`;
+
+  let governanceKeypair: Keypair | undefined;
+  if (options.governanceKeypair) {
+    governanceKeypair = options.governanceKeypair;
+  } else if (env.GOVERNANCE_KEYPAIR) {
+    try {
+      const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]);
+      governanceKeypair = Keypair.fromSecretKey(secret);
+    } catch (err) {
+      app.log.warn({ err }, "invalid GOVERNANCE_KEYPAIR format");
+    }
+  }
 
   let timeSeries: TimeSeriesStore;
   if (options.timeSeries) {
@@ -157,32 +170,28 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   }
 
    let circuitBreaker: CircuitBreakerLoop | null = null;
-  if (env.CIRCUIT_BREAKER_ENABLED) {
-    const breakerSubmitter = env.GOVERNANCE_KEYPAIR
-      ? new SolanaCircuitBreakerSubmitter({
-          connection: new Connection(env.SOLANA_RPC_URL, "confirmed"),
-          signerKeypair: Keypair.fromSecretKey(
-            Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]),
-          ),
-          programId: new PublicKey(env.ATLAS_REGISTRY_PROGRAM_ID),
-        })
-      : new DryRunCircuitBreakerSubmitter();
-    const vaultSubmitter = env.GOVERNANCE_KEYPAIR
-      ? new SolanaVaultEmergencyExitSubmitter({
-          connection: new Connection(env.SOLANA_RPC_URL, "confirmed"),
-          signerKeypair: Keypair.fromSecretKey(
-            Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]),
-          ),
-          programId: new PublicKey(env.ATLAS_VAULT_PROGRAM_ID),
-        })
-      : new DryRunVaultEmergencyExitSubmitter();
-    circuitBreaker = new CircuitBreakerLoop({
+   if (env.CIRCUIT_BREAKER_ENABLED) {
+     const circuitBreakerSubmitter = governanceKeypair
+       ? new SolanaCircuitBreakerSubmitter({
+           connection: new Connection(env.SOLANA_RPC_URL, "confirmed"),
+           signerKeypair: governanceKeypair,
+           programId: new PublicKey(env.ATLAS_REGISTRY_PROGRAM_ID),
+         })
+       : new DryRunCircuitBreakerSubmitter();
+     const vaultEmergencySubmitter = governanceKeypair
+       ? new SolanaVaultEmergencyExitSubmitter({
+           connection: new Connection(env.SOLANA_RPC_URL, "confirmed"),
+           signerKeypair: governanceKeypair,
+           programId: new PublicKey(env.ATLAS_VAULT_PROGRAM_ID),
+         })
+       : new DryRunVaultEmergencyExitSubmitter();
+     circuitBreaker = new CircuitBreakerLoop({
       store: timeSeries,
       managers: repositories.managers,
       vaults: repositories.vaults,
       strategies: repositories.strategies,
-      submitter: breakerSubmitter,
-      vaultSubmitter,
+      submitter: circuitBreakerSubmitter,
+      vaultSubmitter: vaultEmergencySubmitter,
       dlmm: {
         latestForStrategy: async (strategyId: string) => {
           const result = await dlmmStore.latestForStrategy(strategyId);
@@ -232,9 +241,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     scoped.register(async (r) => registerLeaderboardRoutes(r, repositories));
     scoped.register(async (r) => registerOracleRoutes(r, repositories));
     scoped.register(async (r) => registerGovernanceRoutes(r, repositories));
-    scoped.register(async (r) => registerGovernanceExecutionRoutes(r, repositories));
+    scoped.register(async (r) => registerGovernanceExecutionRoutes(r, repositories, governanceKeypair));
     scoped.register(async (r) => registerInsuranceRoutes(r, repositories));
-    scoped.register(async (r) => registerEmergencyExitRoutes(r, repositories, vaultClient));
+    scoped.register(async (r) => registerEmergencyExitRoutes(r, repositories, vaultClient, governanceKeypair));
     scoped.register(async (r) => registerStakingRoutes(r, repositories));
     scoped.register(async (r) => registerTokenRoutes(r, repositories));
     scoped.register(async (r) => registerWebhookRoutes(r, env, repositories));

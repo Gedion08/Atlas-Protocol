@@ -1,7 +1,5 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import type { FastifyRequest } from "fastify";
-import { env } from "../../env.js";
-
+import { createHmac, timingSafeEqual } from "node:crypto";
 export interface HeliusTransaction {
   signature: string;
   timestamp: number;

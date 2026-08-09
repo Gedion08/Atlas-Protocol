@@ -1,5 +1,3 @@
-import type { Strategy } from "atlas-types";
-
 export interface BinState {
   binId: number;
   baseAmount: number;
@@ -38,7 +36,6 @@ export interface DlmmAnalytics {
   priceDrift: number;
 }
 
-const PROTOCOL_FEE_BPS = 25;
 const DEFAULT_SKIP_BPS = 120;
 
 export function estimateBinCount(binStep: number): number {

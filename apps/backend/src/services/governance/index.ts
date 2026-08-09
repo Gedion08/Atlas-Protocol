@@ -1,4 +1,4 @@
-import type { GovernanceProposal, ProposalClass, ProposalStatus, VeLockView } from "atlas-types";
+import type { GovernanceProposal, ProposalClass, VeLockView } from "atlas-types";
 
 export const VOTING_DURATION_SECS = 7 * 86_400;
 export const YEAR_SECS = 31_556_952;

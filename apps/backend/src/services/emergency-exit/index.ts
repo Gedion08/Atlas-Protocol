@@ -105,7 +105,7 @@ export class EmergencyExitService {
   private async settleWithdraw(
     vault: Vault,
     investor: string,
-    shares: number,
+    _shares: number,
   ): Promise<{ signature?: string; error?: string }> {
     if (!vault.onchain) {
       return { error: "Missing on-chain metadata" };

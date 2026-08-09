@@ -572,7 +572,7 @@ export class PgInsuranceRepository implements InsuranceRepository {
     return [];
   }
 
-  async getClaim(id: string): Promise<InsuranceClaim | null> {
+  async getClaim(_id: string): Promise<InsuranceClaim | null> {
     return null;
   }
 

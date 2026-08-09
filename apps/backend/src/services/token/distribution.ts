@@ -5,7 +5,7 @@ import {
   createTransferInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction } from "@solana/web3.js";
 
 export const ATLAS_MINT = new PublicKey("7roukPrgB6rjLrJ9mqHoiCrMTjwYzT8UKbxGgtTRVtEa");
 

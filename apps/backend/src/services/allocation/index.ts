@@ -29,12 +29,6 @@ export function computeRawWeight(input: ManagerAllocationInput): number {
   );
 }
 
-function normalize(weights: number[]): number[] {
-  const sum = weights.reduce((a, b) => a + b, 0);
-  if (sum === 0) return weights.map(() => 0);
-  return weights.map((w) => w / sum);
-}
-
 export function waterFill(
   raw: number[],
   targetTotal: number,

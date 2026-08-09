@@ -10,6 +10,7 @@ import {
 } from "../services/governance/solana.js";
 import { Connection, Keypair, sendAndConfirmTransaction } from "@solana/web3.js";
 import { requireWalletSignature, NonceStore } from "../services/auth/signature.js";
+import { withRateLimit } from "../plugins/security.js";
 
 const executeBody = z.object({
   proposalId: z.string().min(1),
@@ -18,14 +19,15 @@ const executeBody = z.object({
 export async function registerGovernanceExecutionRoutes(
   app: FastifyInstance,
   repos: Repositories,
+  governanceKeypair?: Keypair,
   nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
-  app.post(
+  const route = app.post(
     "/api/v1/governance/proposals/:id/execute",
     { schema: { tags: ["governance"] } },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      const body = executeBody.parse(request.body);
+      executeBody.parse(request.body);
 
       const proposal = await repos.governance.getProposal(id);
       if (!proposal) {
@@ -49,22 +51,12 @@ export async function registerGovernanceExecutionRoutes(
         });
       }
 
-      let executorKeypair: Keypair;
-      if (!env.GOVERNANCE_KEYPAIR) {
+      const executorKeypair = governanceKeypair;
+      if (!executorKeypair) {
         return reply.status(500).send({
           error: "governance_keypair_missing",
           message: "GOVERNANCE_KEYPAIR is not configured",
           statusCode: 500,
-        });
-      }
-      try {
-        const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]);
-        executorKeypair = Keypair.fromSecretKey(secret);
-      } catch {
-        return reply.status(400).send({
-          error: "invalid_keypair",
-          message: "Invalid GOVERNANCE_KEYPAIR format",
-          statusCode: 400,
         });
       }
 
@@ -118,4 +110,6 @@ export async function registerGovernanceExecutionRoutes(
       }
     },
   );
+
+  withRateLimit(route, 5, "1 minute");
 }

@@ -47,7 +47,6 @@ export async function registerWebhookRoutes(
       const vaults = await repos.vaults.list();
       const vaultByAddress = new Map(vaults.map((v) => [v.address, v]));
       const strategies = await repos.strategies.list();
-      const strategyByVault = new Map(strategies.map((s) => [s.pool, s]));
 
       for (const event of events) {
         if (!event.managerId && event.vaultAddress) {

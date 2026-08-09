@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, Transaction } from "@solana/web3.js";
 import {
   buildSetScoreInstruction,
   clampScore,
@@ -13,7 +13,7 @@ import {
 import type { OracleSubmission } from "../src/services/oracle/index.js";
 
 const sendTx = vi.hoisted(() =>
-  vi.fn(async (_connection: unknown, tx: Transaction, _signers: unknown[]) => "fake-signature"),
+  vi.fn(async (_connection: unknown, _tx: Transaction, _signers: unknown[]) => "fake-signature"),
 );
 vi.mock("@solana/web3.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@solana/web3.js")>();

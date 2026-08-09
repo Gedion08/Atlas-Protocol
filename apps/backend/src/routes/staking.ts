@@ -11,7 +11,7 @@ import {
   buildClaimInstruction,
   getBondMint,
 } from "../services/staking/solana.js";
-import { Connection, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 const bondBody = z.object({
@@ -27,7 +27,7 @@ const claimBody = z.object({
   owner: z.string().min(1),
 });
 
-export async function registerStakingRoutes(app: FastifyInstance, repos: Repositories): Promise<void> {
+export async function registerStakingRoutes(app: FastifyInstance, _repos: Repositories): Promise<void> {
   app.get(
     "/api/v1/staking/bond/:owner",
     { schema: { tags: ["staking"] } },

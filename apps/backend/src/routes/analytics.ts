@@ -46,7 +46,7 @@ export async function registerAnalyticsRoutes(
   app.get(
     "/api/v1/analytics/dlmm",
     { schema: { tags: ["analytics"] } },
-    async (request, reply) => {
+    async (request, _reply) => {
       const query = dlmmQuery.parse(request.query);
       const strategies = await repos.strategies.list({
         protocol: query.protocol ?? "meteora",

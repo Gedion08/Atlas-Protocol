@@ -3,7 +3,6 @@ import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import {
   bondEscrowPda,
   bondPda,
-  BOND_DISCRIMINATOR,
   buildBondInstruction,
   STAKING_PROGRAM_ID,
 } from "../src/services/staking/solana.js";

@@ -22,7 +22,7 @@ const saleBuildBody = z.object({
   solAmount: z.number().positive(),
 });
 
-export async function registerTokenRoutes(app: FastifyInstance, repos: Repositories): Promise<void> {
+export async function registerTokenRoutes(app: FastifyInstance, _repos: Repositories): Promise<void> {
   app.get(
     "/api/v1/token/balance/:owner",
     { schema: { tags: ["token"] } },

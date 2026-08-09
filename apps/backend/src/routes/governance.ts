@@ -5,7 +5,6 @@ import { env } from "../env.js";
 import {
   ATLAS_MINT,
   buildCreateLockTransaction,
-  CREATE_LOCK_DISCRIMINATOR,
   governanceConfigPda,
   governanceVaultPda,
   GOVERNANCE_PROGRAM_ID,

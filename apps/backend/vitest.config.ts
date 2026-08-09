@@ -18,8 +18,9 @@ export default defineConfig({
       exclude: ["src/index.ts", "src/db/seed.ts", "src/db/bootstrap.ts", "src/config.ts"],
       thresholds: {
         lines: 60,
-        functions: 60,
+        functions: 70,
         statements: 60,
+        branches: 50,
       },
     },
   },

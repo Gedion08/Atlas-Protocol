@@ -1,4 +1,4 @@
-import type { DlmmSnapshot, DlmmAnalytics } from "./dlmm.js";
+import type { DlmmSnapshot } from "./dlmm.js";
 
 const DEFAULT_METEORA_API = "https://api.meteora.ag/v1/dlmm";
 

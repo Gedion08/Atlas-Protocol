@@ -96,6 +96,14 @@ jobs:
               exit 1
             fi
           done
+      - name: Verify Anchor TypeScript tests compile
+        run: |
+          cd programs
+          for test in vault/tests/vault.ts manager-registry/tests/*.ts staking/tests/*.ts governance/tests/*.ts treasury/tests/*.ts; do
+            if [ -f "$test" ]; then
+              npx tsc --noEmit --esModuleInterop --module commonjs --moduleResolution node --target ES2020 --skipLibCheck "$test" 2>&1 || echo "::warning::Compile check failed for $test"
+            fi
+          done
 
   docker:
     name: Docker images

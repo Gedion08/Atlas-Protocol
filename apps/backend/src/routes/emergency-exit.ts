@@ -6,6 +6,7 @@ import { EmergencyExitService } from "../services/emergency-exit/index.js";
 import { VaultClient } from "../services/vault/index.js";
 import { Connection, Keypair } from "@solana/web3.js";
 import { requireWalletSignature, NonceStore } from "../services/auth/signature.js";
+import { withRateLimit } from "../plugins/security.js";
 
 const emergencyExitBody = z.object({
   vaultAddress: z.string().min(1),
@@ -15,30 +16,21 @@ export async function registerEmergencyExitRoutes(
   app: FastifyInstance,
   repos: Repositories,
   vaultClient: VaultClient,
+  governanceKeypair?: Keypair,
   nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
-  app.post(
+  const route = app.post(
     "/api/v1/emergency-exit",
     { schema: { tags: ["emergency"] } },
     async (request, reply) => {
       const body = emergencyExitBody.parse(request.body);
 
-      let executorKeypair: Keypair;
-      if (!env.GOVERNANCE_KEYPAIR) {
+      const executorKeypair = governanceKeypair;
+      if (!executorKeypair) {
         return reply.status(500).send({
           error: "governance_keypair_missing",
           message: "GOVERNANCE_KEYPAIR is not configured",
           statusCode: 500,
-        });
-      }
-      try {
-        const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR) as number[]);
-        executorKeypair = Keypair.fromSecretKey(secret);
-      } catch {
-        return reply.status(400).send({
-          error: "invalid_keypair",
-          message: "Invalid GOVERNANCE_KEYPAIR format",
-          statusCode: 400,
         });
       }
 
@@ -90,4 +82,6 @@ export async function registerEmergencyExitRoutes(
       });
     },
   );
+
+  withRateLimit(route, 5, "1 minute");
 }

@@ -101,6 +101,9 @@ pnpm install
 # Build shared types (required before backend/frontend)
 pnpm --filter atlas-types build
 
+# Build strategy SDK (required before backend typecheck)
+pnpm --filter strategy-sdk build
+
 # Run type checking across the workspace
 pnpm typecheck
 
@@ -118,6 +121,19 @@ pnpm --filter atlas-frontend test
 pnpm dev:backend
 pnpm dev:frontend
 ```
+
+## Build order
+
+TypeScript packages must be built in dependency order before backend/frontend type checking or builds:
+
+```bash
+pnpm --filter atlas-types build    # shared types (no dependencies)
+pnpm --filter strategy-sdk build   # depends on atlas-types
+# then: pnpm --filter atlas-backend build / typecheck
+# then: pnpm --filter atlas-frontend build / typecheck
+```
+
+The backend `typecheck` script automatically builds these dependencies via the `pretypecheck` hook.
 
 ## Build and test Rust programs
 

@@ -2,7 +2,6 @@
 const nextConfig = {
   transpilePackages: ["atlas-types"],
   reactStrictMode: true,
-  output: "standalone",
   poweredByHeader: false,
   async headers() {
     return [

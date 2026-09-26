@@ -31,13 +31,13 @@
 
 | Program            | Responsibility                                                                 |
 | ------------------ | ------------------------------------------------------------------------------ |
-| `vault`            | Vault state (authority, manager, fees, status), deposits (mint shares), withdrawals (burn shares, 1:1 scaffold pricing), parameter updates                         |
+| `vault`            | Vault state (authority, manager, fees, status), deposits (mint shares at NAVPS), queued withdrawals (request → settle pro-rata against liquid escrow; settled requests are closed so the PDA can be reused; redeemable during emergency shutdown), M-of-N oracle NAV marks, fee settlement, parameter updates |
 | `manager-registry` | Manager profiles (PDA per owner), on-chain weighted score with validated 0-100 components, status lifecycle (active/suspended/banned) |
 | `staking`          | Bonding escrow (PDA token account), unbond with cooldown, claim, slashing by slash authority to insurance escrow |
 
-Scaffold simplifications: share pricing is 1:1 until the Performance Oracle is wired in;
-`set_score` is currently permissionless (anyone may submit scores) and must be gated by
-governance or an oracle signature before mainnet.
+Shares are priced at net NAV per share, marked by the median of an M-of-N oracle set
+(minimum 3 signers, bounded per-mark moves). `set_score` only accepts the configured
+registry oracle, and scores at or below the threshold auto-suspend the manager.
 
 ### Backend services (TypeScript, Fastify)
 

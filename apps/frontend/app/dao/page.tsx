@@ -7,7 +7,7 @@ import { Connection } from "@solana/web3.js";
 import { decodeTransaction } from "@/lib/solana";
 import { Landmark, ShieldCheck, Users, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, signRequest } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -216,15 +216,20 @@ function CreateVeLockForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function CreateProposalForm({ proposer }: { proposer: string }) {
+function CreateProposalForm() {
   const queryClient = useQueryClient();
+  const { publicKey, signMessage } = useWallet();
+  const proposer = publicKey?.toBase58() ?? "";
   const [title, setTitle] = useState("");
   const [class_, setClass] = useState<ProposalClass>("parametric");
   const [targetProgram, setTargetProgram] = useState("");
   const [days, setDays] = useState("7");
 
   const mutation = useMutation({
-    mutationFn: (input: ProposalInput) => api.createProposal(input),
+    mutationFn: async (input: ProposalInput) => {
+      if (!signMessage) throw new Error("Wallet cannot sign messages");
+      return api.createProposal(input, await signRequest(input.proposer, input, signMessage));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["proposals"] });
       setTitle("");
@@ -283,7 +288,7 @@ function CreateProposalForm({ proposer }: { proposer: string }) {
             <input value={targetProgram} onChange={(e) => setTargetProgram(e.target.value)} className={inputClass} placeholder="Program address the instruction executes against" />
           </label>
           <div className="flex items-center gap-3">
-            <Button type="submit" disabled={mutation.isPending || !title}>
+            <Button type="submit" disabled={mutation.isPending || !title || !proposer}>
               {mutation.isPending ? "Creating…" : "Create"}
             </Button>
             {mutation.isError && <Badge variant="destructive">{mutation.error.message}</Badge>}
@@ -300,19 +305,20 @@ function CreateProposalForm({ proposer }: { proposer: string }) {
 export default function DaoPage() {
   const { data: proposals } = useQuery({ queryKey: ["proposals"], queryFn: api.proposals });
   const { data: locks } = useQuery({ queryKey: ["locks"], queryFn: api.locks });
-  const { data: managers } = useQuery({ queryKey: ["managers"], queryFn: api.managers });
   const { data: vaults } = useQuery({ queryKey: ["vaults"], queryFn: api.vaults });
-  const { connected, publicKey } = useWallet();
+  const { connected, publicKey, signMessage } = useWallet();
   const queryClient = useQueryClient();
-  const [proposer, setProposer] = useState("");
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("all");
 
   const wallet = connected && publicKey ? publicKey.toBase58() : "";
-  const voter = wallet || proposer;
+  const voter = wallet;
 
   const vote = useMutation({
-    mutationFn: ({ id, inFavor }: { id: string; inFavor: boolean }) =>
-      api.castVote(id, { voter, inFavor }),
+    mutationFn: async ({ id, inFavor }: { id: string; inFavor: boolean }) => {
+      if (!signMessage) throw new Error("Wallet cannot sign messages");
+      const input = { voter, inFavor };
+      return api.castVote(id, input, await signRequest(voter, input, signMessage));
+    },
     onSuccess: (updated) => {
       queryClient.setQueryData(["proposals"], (old: { id: string }[] | undefined) =>
         (old ?? []).map((p) => (p.id === updated.id ? updated : p)),
@@ -425,7 +431,7 @@ export default function DaoPage() {
                       </Button>
                       {!voter && (
                         <span className="text-xs text-muted-foreground">
-                          Connect a wallet or choose a voting wallet below to vote.
+                          Connect a wallet to vote.
                         </span>
                       )}
                     </div>
@@ -527,24 +533,11 @@ export default function DaoPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        {connected && publicKey && (
-          <Badge variant="positive">Voting as {publicKey.toBase58().slice(0, 8)}…</Badge>
-        )}
-        <label className="flex-1 space-y-1">
-          <span className="text-xs text-muted-foreground">Voting wallet {connected && "(or use your connected wallet)"}</span>
-          <select value={proposer} onChange={(e) => setProposer(e.target.value)} className={inputClass}>
-            <option value="">Choose a wallet…</option>
-            {(managers ?? []).map((m) => (
-              <option key={m.id} value={m.owner}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      {connected && publicKey && (
+        <Badge variant="positive">Voting as {publicKey.toBase58().slice(0, 8)}…</Badge>
+      )}
 
-      <CreateProposalForm proposer={proposer || wallet || "anonymous"} />
+      <CreateProposalForm />
     </div>
   );
 }

@@ -42,6 +42,7 @@ import {
   SolanaVaultEmergencyExitSubmitter,
 } from "./services/circuit-breaker/index.js";
 import { VaultClient } from "./services/vault/index.js";
+import { NonceStore } from "./services/auth/signature.js";
 import { DlmmEnricher } from "./services/analytics/dlmm-enricher.js";
 import { ClickHouseDlmmAnalyticsStore, type DlmmAnalyticsStore } from "./services/analytics/dlmm.js";
 
@@ -87,6 +88,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     try {
       timeSeries = new PgTimeSeriesStore(buildPgPool(env.DATABASE_URL, { max: 5 }));
     } catch (error) {
+      if (env.NODE_ENV === "production") throw error;
       app.log.warn({ error }, "failed to connect to PostgreSQL for timeSeries, falling back to in-memory");
       timeSeries = new InMemoryTimeSeriesStore();
     }
@@ -103,6 +105,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     try {
       repositories = await createPostgresRepositories();
     } catch (error) {
+      // In production, serving from memory would silently drop every write.
+      if (env.NODE_ENV === "production") throw error;
       app.log.warn({ error }, "failed to connect to PostgreSQL, falling back to in-memory repositories");
       repositories = createMemoryRepositories(timeSeries);
     }
@@ -232,18 +236,22 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     uiConfig: { docExpansion: "list", deepLinking: false },
   });
 
+  // One nonce registry for every wallet-signed route, so a signed request
+  // consumed on one endpoint cannot be replayed against another.
+  const nonces = new NonceStore();
+
   app.register(async (scoped) => {
     scoped.register(async (r) => registerHealthRoutes(r, repositories, env));
-    scoped.register(async (r) => registerVaultRoutes(r, repositories, vaultClient));
-    scoped.register(async (r) => registerInvestorRoutes(r, repositories, undefined, vaultClient));
+    scoped.register(async (r) => registerVaultRoutes(r, repositories, vaultClient, nonces));
+    scoped.register(async (r) => registerInvestorRoutes(r, repositories, nonces, vaultClient));
     scoped.register(async (r) => registerManagerRoutes(r, repositories));
-    scoped.register(async (r) => registerStrategyRoutes(r, repositories));
+    scoped.register(async (r) => registerStrategyRoutes(r, repositories, nonces));
     scoped.register(async (r) => registerLeaderboardRoutes(r, repositories));
     scoped.register(async (r) => registerOracleRoutes(r, repositories));
-    scoped.register(async (r) => registerGovernanceRoutes(r, repositories));
-    scoped.register(async (r) => registerGovernanceExecutionRoutes(r, repositories, governanceKeypair));
-    scoped.register(async (r) => registerInsuranceRoutes(r, repositories));
-    scoped.register(async (r) => registerEmergencyExitRoutes(r, repositories, vaultClient, governanceKeypair));
+    scoped.register(async (r) => registerGovernanceRoutes(r, repositories, nonces));
+    scoped.register(async (r) => registerGovernanceExecutionRoutes(r, repositories, governanceKeypair, nonces));
+    scoped.register(async (r) => registerInsuranceRoutes(r, repositories, governanceKeypair, nonces));
+    scoped.register(async (r) => registerEmergencyExitRoutes(r, repositories, vaultClient, governanceKeypair, nonces));
     scoped.register(async (r) => registerStakingRoutes(r, repositories));
     scoped.register(async (r) => registerTokenRoutes(r, repositories));
     scoped.register(async (r) => registerWebhookRoutes(r, env, repositories));

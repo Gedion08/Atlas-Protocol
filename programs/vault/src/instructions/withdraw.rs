@@ -82,11 +82,17 @@ pub struct SettleWithdraw<'info> {
         mut,
         seeds = [b"atlas_vault", vault.authority.as_ref(), vault.base_mint.as_ref()],
         bump = vault.bump,
-        constraint = vault.status == VaultStatus::Active @ VaultError::VaultPaused
+        // Emergency shutdown must still let investors redeem (see `emergency_exit`).
+        constraint = matches!(vault.status, VaultStatus::Active | VaultStatus::Emergency)
+            @ VaultError::VaultPaused
     )]
     pub vault: Box<Account<'info, Vault>>,
+    /// Only the requester may settle, and the request is closed (rent back to
+    /// the requester) so the same PDA can be re-used for later withdrawals.
     #[account(
         mut,
+        close = user,
+        has_one = user @ VaultError::Unauthorized,
         seeds = [b"withdraw", request.vault.as_ref(), request.user.as_ref()],
         bump = request.bump,
         constraint = request.vault == vault.key() @ VaultError::Unauthorized

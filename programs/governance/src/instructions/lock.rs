@@ -163,8 +163,13 @@ pub struct WithdrawLock<'info> {
         bump
     )]
     pub vault: Box<Account<'info, TokenAccount>>,
+    /// Closed on withdrawal (rent back to the owner) so the owner can
+    /// `create_lock` again at the same PDA. Vote records are keyed by
+    /// `[vote, proposal, lock]` and outlive the lock, so re-locking cannot
+    /// double-vote on a proposal.
     #[account(
         mut,
+        close = owner,
         seeds = [b"ve_lock", owner.key().as_ref()],
         bump = lock.bump,
         constraint = lock.owner == owner.key() @ GovernanceError::Unauthorized

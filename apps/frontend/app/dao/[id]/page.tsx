@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ArrowLeft, Vote } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, signRequest } from "@/lib/api";
 import { formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ export default function ProposalDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { publicKey } = useWallet();
+  const { publicKey, signMessage } = useWallet();
   const wallet = publicKey?.toBase58() ?? "";
   const [selectedVote, setSelectedVote] = useState<"for" | "against" | null>(null);
   const [voting, setVoting] = useState(false);
@@ -63,10 +63,11 @@ export default function ProposalDetailPage() {
   const now = Math.floor(Date.now() / 1000);
 
   async function handleVote(inFavor: boolean) {
-    if (!display || !canVote || !wallet) return;
+    if (!display || !canVote || !wallet || !signMessage) return;
     setVoting(true);
     try {
-      await api.castVote(display.id, { voter: wallet, inFavor });
+      const input = { voter: wallet, inFavor };
+      await api.castVote(display.id, input, await signRequest(wallet, input, signMessage));
       queryClient.invalidateQueries({ queryKey: ["proposal", params.id] });
       queryClient.invalidateQueries({ queryKey: ["proposals"] });
     } finally {

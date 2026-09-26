@@ -28,6 +28,7 @@ ARG NEXT_PUBLIC_API_URL=http://localhost:8080
 ARG NEXT_PUBLIC_RPC_URL=https://api.mainnet-beta.solana.com
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_RPC_URL=$NEXT_PUBLIC_RPC_URL
+ENV NEXT_OUTPUT_STANDALONE=1
 COPY apps/frontend apps/frontend
 RUN pnpm --filter atlas-frontend build
 
@@ -36,7 +37,6 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=frontend-builder /app/apps/frontend/.next/standalone ./
 COPY --from=frontend-builder /app/apps/frontend/.next/static ./apps/frontend/.next/static
-COPY --from=frontend-builder /app/apps/frontend/public ./apps/frontend/public
 EXPOSE 3000
 USER node
 CMD ["node", "apps/frontend/server.js"]

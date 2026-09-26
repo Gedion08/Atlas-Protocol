@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Standalone output is opt-in: the Docker image needs it (see Dockerfile), but
+  // Vercel's Next.js 16 build breaks with it enabled.
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "1" ? { output: "standalone" } : {}),
   transpilePackages: ["atlas-types"],
   reactStrictMode: true,
   poweredByHeader: false,

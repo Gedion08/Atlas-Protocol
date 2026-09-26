@@ -9,6 +9,7 @@ Atlas Protocol: Solana (Anchor) programs + Fastify backend + Next.js frontend, a
 - `apps/frontend/` — Next.js 15 + Tailwind 4 + TanStack Query.
 - `packages/types/` — shared TS types (`atlas-types`). Only workspace package consumed by both apps.
 - `packages/sdk/` — `atlas-sdk`: typed client over the backend API (vaults, strategies, uploads, leaderboard, risk). Build order: `atlas-types` first, then `atlas-sdk`.
+- `packages/strategy-sdk/` — consumed by the backend; build it after `atlas-types` (backend `pretypecheck` does both).
 - `docs/` — architecture, risk-engine, manager-score, protocol-economics. Keep in sync when changing formulas or account layouts (CONTRIBUTING requirement).
 
 ## Automation (spec §12.2)
@@ -23,7 +24,8 @@ pnpm --filter atlas-types build      # REQUIRED first: apps import atlas-types f
 pnpm --filter atlas-sdk build        # second: depends on atlas-types dist/
 pnpm --filter atlas-backend test     # vitest; in-memory repos, no Postgres needed
 pnpm --filter atlas-frontend test    # vitest + jsdom
-pnpm --filter atlas-frontend lint    # only frontend has a lint script (backend: none)
+pnpm --filter atlas-frontend lint
+pnpm --filter atlas-backend lint
 pnpm typecheck                       # tsc across workspace
 pnpm db:migrate                      # applies apps/backend/db/migrations/*.sql; needs live Postgres
 cargo test --workspace --manifest-path programs/Cargo.toml

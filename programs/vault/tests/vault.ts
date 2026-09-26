@@ -592,6 +592,25 @@ describe("atlas-vault", () => {
     expect(request.shares.toString()).toBe(depositAmount.toString());
     expect(request.settled).toBe(false);
 
+    // Only the requester may settle their own request.
+    await expect(
+      program.methods
+        .settleWithdraw()
+        .accounts({
+          config: vaultConfigPda,
+          vault: vaultPda,
+          request: requestPda,
+          user: manager.publicKey,
+          vaultEscrow: vaultEscrowPda,
+          userToken: userToken.address,
+          userShares,
+          sharesMint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([manager])
+        .rpc(),
+    ).rejects.toThrow();
+
     await program.methods
       .settleWithdraw()
       .accounts({
@@ -608,13 +627,30 @@ describe("atlas-vault", () => {
       .signers([user])
       .rpc();
 
-    const settled = await program.account.withdrawalRequest.fetch(requestPda);
-    expect(settled.settled).toBe(true);
+    // Settled requests are closed so the PDA can be re-used.
+    expect(await program.account.withdrawalRequest.fetchNullable(requestPda)).toBeNull();
 
     // The vault was short of cash vs. the oracle-marked gain, so the fill was
     // pro-rata: the user keeps the unfilled shares.
     const remaining = await provider.connection.getTokenAccountBalance(userShares);
     expect(remaining.value.amount).toBe("92593");
+
+    // ...and can queue a second withdrawal for them.
+    await program.methods
+      .requestWithdraw(new BN(remaining.value.amount))
+      .accounts({
+        config: vaultConfigPda,
+        vault: vaultPda,
+        request: requestPda,
+        user: user.publicKey,
+        userShares,
+        sharesMint,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([user])
+      .rpc();
+    const second = await program.account.withdrawalRequest.fetch(requestPda);
+    expect(second.shares.toString()).toBe(remaining.value.amount);
   });
 
   it("rejects non-governance parameter updates", async () => {

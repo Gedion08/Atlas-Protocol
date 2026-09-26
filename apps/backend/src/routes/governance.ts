@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "../db/repositories.js";
 import { env } from "../env.js";
@@ -11,6 +11,7 @@ import {
   veLockPda,
 } from "../services/governance/solana.js";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { NonceStore, requireWalletSignature } from "../services/auth/signature.js";
 
 const proposalParam = z.object({ id: z.string().min(1) });
 
@@ -43,7 +44,19 @@ const createLockBody = z.object({
 export async function registerGovernanceRoutes(
   app: FastifyInstance,
   repos: Repositories,
+  nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
+  /** The claimed proposer/voter must have wallet-signed the request (spec §7.1). */
+  const requireSigner = (request: FastifyRequest, expectedOwner: string) =>
+    requireWalletSignature({
+      nonces,
+      ownerHeader: request.headers["x-atlas-owner"] as string | undefined,
+      nonceHeader: request.headers["x-atlas-nonce"] as string | undefined,
+      signatureHeader: request.headers["x-atlas-signature"] as string | undefined,
+      body: request.body,
+      expectedOwner,
+    });
+
   app.get(
     "/api/v1/governance/proposals",
     { schema: { tags: ["governance"] } },
@@ -71,6 +84,8 @@ export async function registerGovernanceRoutes(
     { schema: { tags: ["governance"] } },
     async (request, reply) => {
       const input = proposalBody.parse(request.body);
+      const auth = requireSigner(request, input.proposer);
+      if (!auth.ok) return reply.status(auth.statusCode).send(auth);
       const proposal = await repos.governance.createProposal(input);
       return reply.status(201).send({ data: proposal });
     },
@@ -91,6 +106,8 @@ export async function registerGovernanceRoutes(
     async (request, reply) => {
       const { id } = proposalParam.parse(request.params);
       const vote = voteBody.parse(request.body);
+      const auth = requireSigner(request, vote.voter);
+      if (!auth.ok) return reply.status(auth.statusCode).send(auth);
       const proposal = await repos.governance.castVote(id, vote);
       if (!proposal) {
         return reply.status(404).send({ error: "proposal_not_found", message: "Proposal not found", statusCode: 404 });

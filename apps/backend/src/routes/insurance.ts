@@ -1,14 +1,14 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Repositories } from "../db/repositories.js";
 import { env } from "../env.js";
 import { buildActivateInsuranceInstruction, TREASURY_PROGRAM_ID } from "../services/treasury/solana.js";
 import { InsuranceService } from "../services/insurance/index.js";
 import { Connection, Keypair, PublicKey, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
+import { NonceStore, requireWalletSignature } from "../services/auth/signature.js";
 
 const activateBody = z.object({
   amount: z.number().positive(),
-  executor: z.string().min(1),
 });
 
 const claimBody = z.object({
@@ -22,7 +22,6 @@ const claimBody = z.object({
 
 const assessBody = z.object({
   claimId: z.string().min(1),
-  executor: z.string().min(1),
   assessor: z.string().min(1),
   notes: z.string().min(1),
   recommendedAmount: z.number().positive(),
@@ -31,44 +30,52 @@ const assessBody = z.object({
 
 const adjudicateBody = z.object({
   claimId: z.string().min(1),
-  executor: z.string().min(1),
   approved: z.boolean(),
   notes: z.string().optional(),
 });
 
 const payoutBody = z.object({
   claimId: z.string().min(1),
-  executor: z.string().min(1),
   signature: z.string().min(1),
   amount: z.number().positive(),
 });
 
-function parseExecutor(): Keypair | null {
-  if (env.GOVERNANCE_KEYPAIR) {
-    try {
-      const secret = Uint8Array.from(JSON.parse(env.GOVERNANCE_KEYPAIR));
-      return Keypair.fromSecretKey(secret);
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function assertExecutor(executorKeypair: Keypair | null, expected: string) {
-  if (!executorKeypair || executorKeypair.publicKey.toBase58() !== expected) {
+/**
+ * Privileged insurance actions must be wallet-signed by the governance keypair
+ * (spec §7.1). Comparing a body-supplied pubkey is not authentication: the
+ * governance pubkey is public on-chain.
+ */
+function authorizeGovernance(
+  request: FastifyRequest,
+  governanceKeypair: Keypair | undefined,
+  nonces: NonceStore,
+):
+  | { ok: true; executor: Keypair }
+  | { ok: false; error: string; message: string; statusCode: number } {
+  if (!governanceKeypair) {
     return {
-      error: "unauthorized_executor",
-      message: "Executor does not match configured governance keypair",
-      statusCode: 403,
+      ok: false,
+      error: "governance_keypair_missing",
+      message: "GOVERNANCE_KEYPAIR is not configured",
+      statusCode: 500,
     };
   }
-  return null;
+  const auth = requireWalletSignature({
+    nonces,
+    ownerHeader: request.headers["x-atlas-owner"] as string | undefined,
+    nonceHeader: request.headers["x-atlas-nonce"] as string | undefined,
+    signatureHeader: request.headers["x-atlas-signature"] as string | undefined,
+    body: request.body,
+    expectedOwner: governanceKeypair.publicKey.toBase58(),
+  });
+  return auth.ok ? { ok: true, executor: governanceKeypair } : auth;
 }
 
 export async function registerInsuranceRoutes(
   app: FastifyInstance,
   repos: Repositories,
+  governanceKeypair?: Keypair,
+  nonces: NonceStore = new NonceStore(),
 ): Promise<void> {
   const service = new InsuranceService(repos);
 
@@ -78,16 +85,9 @@ export async function registerInsuranceRoutes(
     async (request, reply) => {
       const body = activateBody.parse(request.body);
 
-      const executorKeypair = parseExecutor();
-      if (!executorKeypair) {
-        return reply.status(400).send({
-          error: "invalid_keypair",
-          message: "Invalid GOVERNANCE_KEYPAIR format",
-          statusCode: 400,
-        });
-      }
-      const authError = assertExecutor(executorKeypair, body.executor);
-      if (authError) return reply.status(authError.statusCode).send(authError);
+      const auth = authorizeGovernance(request, governanceKeypair, nonces);
+      if (!auth.ok) return reply.status(auth.statusCode).send(auth);
+      const executorKeypair = auth.executor;
 
       const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
       const [configPda] = PublicKey.findProgramAddressSync(
@@ -201,9 +201,8 @@ export async function registerInsuranceRoutes(
       const { id } = request.params as { id: string };
       const body = assessBody.parse(request.body);
 
-      const executorKeypair = parseExecutor();
-      const authError = assertExecutor(executorKeypair, body.executor);
-      if (authError) return reply.status(authError.statusCode).send(authError);
+      const auth = authorizeGovernance(request, governanceKeypair, nonces);
+      if (!auth.ok) return reply.status(auth.statusCode).send(auth);
 
       try {
         const claim = await service.assessClaim({
@@ -232,12 +231,11 @@ export async function registerInsuranceRoutes(
       const { id } = request.params as { id: string };
       const body = adjudicateBody.parse(request.body);
 
-      const executorKeypair = parseExecutor();
-      const authError = assertExecutor(executorKeypair, body.executor);
-      if (authError) return reply.status(authError.statusCode).send(authError);
+      const auth = authorizeGovernance(request, governanceKeypair, nonces);
+      if (!auth.ok) return reply.status(auth.statusCode).send(auth);
 
       try {
-        const claim = await service.adjudicateClaim(id, body.approved, body.executor, body.notes);
+        const claim = await service.adjudicateClaim(id, body.approved, auth.executor.publicKey.toBase58(), body.notes);
         return reply.status(200).send({ data: claim });
       } catch (err) {
         return reply.status(400).send({
@@ -256,9 +254,8 @@ export async function registerInsuranceRoutes(
       const { id } = request.params as { id: string };
       const body = payoutBody.parse(request.body);
 
-      const executorKeypair = parseExecutor();
-      const authError = assertExecutor(executorKeypair, body.executor);
-      if (authError) return reply.status(authError.statusCode).send(authError);
+      const auth = authorizeGovernance(request, governanceKeypair, nonces);
+      if (!auth.ok) return reply.status(auth.statusCode).send(auth);
 
       try {
         const claim = await service.processPayout({

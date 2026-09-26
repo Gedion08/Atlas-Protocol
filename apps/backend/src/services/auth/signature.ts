@@ -62,8 +62,9 @@ export interface SignedRequestDeps {
  * Authenticates a wallet-signed request (spec §7.1): the client signs the
  * canonical auth message over the exact request-body JSON, so the server
  * re-derives it from the parsed body. `owner` must match the caller's public
- * key; nonces are single-use and expire after 5 minutes. Used by strategy
- * uploads and vault deposits/withdrawals.
+ * key; nonces embed their issue time, are single-use, and expire 5 minutes
+ * after issuance. Used by strategy uploads, vault deposits/withdrawals,
+ * governance votes/proposals and governance-only actions.
  */
 export function requireWalletSignature(deps: SignedRequestDeps): SignedRequestResult {
   const { ownerHeader, nonceHeader, signatureHeader, body } = deps;
@@ -79,7 +80,7 @@ export function requireWalletSignature(deps: SignedRequestDeps): SignedRequestRe
     return { ok: false, error: "signer_mismatch", message: "Signer is not the expected wallet", statusCode: 403 };
   }
   if (!deps.nonces.isFresh(nonceHeader)) {
-    return { ok: false, error: "stale_or_reused_nonce", message: "Nonce expired or already used", statusCode: 400 };
+    return { ok: false, error: "stale_or_reused_nonce", message: "Nonce malformed, expired or already used", statusCode: 400 };
   }
   const payloadSha256 = sha256Hex(JSON.stringify(body));
   const message = buildAuthMessage({ owner: ownerHeader, nonce: nonceHeader, payloadSha256 });
@@ -90,7 +91,21 @@ export function requireWalletSignature(deps: SignedRequestDeps): SignedRequestRe
   return { ok: true };
 }
 
-/** Single-use nonce registry with TTL eviction (per-instance; Redis for multi-node). */
+/** Allowed client clock drift ahead of the server when checking nonce issue time. */
+const MAX_NONCE_CLOCK_SKEW_MS = 60_000;
+
+/** Issue time (ms) embedded in a `<unix-ms>-<random>` nonce, or null if malformed. */
+export function nonceIssuedAt(nonce: string): number | null {
+  const match = /^(\d{13})-[0-9a-z]{1,48}$/i.exec(nonce);
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * Single-use nonce registry (per-instance; Redis for multi-node). Nonces carry
+ * their issue time (`newNonce()` format), so a nonce is only accepted within
+ * `ttlMs` of issuance and is remembered until then. Once forgotten it is too old
+ * to be accepted again, so evicting it can never re-open a replay window.
+ */
 export class NonceStore {
   private readonly seen = new Map<string, number>();
 
@@ -99,16 +114,20 @@ export class NonceStore {
     private readonly now: () => number = () => Date.now(),
   ) {}
 
-  /** True if the nonce is unseen and not expired; marks it consumed otherwise. */
+  /** True if the nonce is well-formed, within its validity window, and unused. */
   isFresh(nonce: string): boolean {
-    const expiresAt = this.seen.get(nonce);
-    if (expiresAt !== undefined && expiresAt > this.now()) return false;
-    this.seen.delete(nonce);
-    return true;
+    const issuedAt = nonceIssuedAt(nonce);
+    if (issuedAt === null) return false;
+    const now = this.now();
+    if (issuedAt > now + MAX_NONCE_CLOCK_SKEW_MS) return false;
+    if (now - issuedAt > this.ttlMs) return false;
+    return !this.seen.has(nonce);
   }
 
   consume(nonce: string): void {
-    this.seen.set(nonce, this.now() + this.ttlMs);
+    const issuedAt = nonceIssuedAt(nonce) ?? this.now();
+    // Remember until the nonce ages out of its validity window (plus skew slack).
+    this.seen.set(nonce, Math.max(issuedAt, this.now()) + this.ttlMs + MAX_NONCE_CLOCK_SKEW_MS);
     if (this.seen.size > 10_000) this.evict();
   }
 

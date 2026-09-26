@@ -14,7 +14,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 
 const faucetBody = z.object({
   recipient: z.string().min(32).max(44),
-  amount: z.number().positive().default(env.ATLAS_FAUCET_AMOUNT),
+  amount: z.number().positive().max(env.ATLAS_FAUCET_AMOUNT).default(env.ATLAS_FAUCET_AMOUNT),
 });
 
 const saleBuildBody = z.object({
@@ -23,6 +23,10 @@ const saleBuildBody = z.object({
 });
 
 export async function registerTokenRoutes(app: FastifyInstance, _repos: Repositories): Promise<void> {
+  // Last faucet drip per recipient and per client IP (per-instance; Redis for multi-node).
+  const lastDrip = new Map<string, number>();
+  const cooldownMs = env.ATLAS_FAUCET_COOLDOWN_SECS * 1000;
+
   app.get(
     "/api/v1/token/balance/:owner",
     { schema: { tags: ["token"] } },
@@ -63,8 +67,20 @@ export async function registerTokenRoutes(app: FastifyInstance, _repos: Reposito
     "/api/v1/token/faucet",
     { schema: { tags: ["token"] } },
     async (request, reply) => {
+      const body = faucetBody.parse(request.body);
+      const keys = [`recipient:${body.recipient}`, `ip:${request.ip}`];
+      const at = Date.now();
+      for (const [key, ts] of lastDrip) if (at - ts >= cooldownMs) lastDrip.delete(key);
+      if (keys.some((key) => lastDrip.has(key))) {
+        return reply.status(429).send({
+          error: "faucet_cooldown",
+          message: `Faucet can be used once every ${env.ATLAS_FAUCET_COOLDOWN_SECS}s per wallet and client`,
+          statusCode: 429,
+        });
+      }
+      // Reserve before sending so concurrent requests cannot double-drip.
+      for (const key of keys) lastDrip.set(key, at);
       try {
-        const body = faucetBody.parse(request.body);
         const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
         const recipient = new PublicKey(body.recipient);
 
@@ -82,6 +98,7 @@ export async function registerTokenRoutes(app: FastifyInstance, _repos: Reposito
 
         return reply.status(200).send({ data: result });
       } catch (error) {
+        for (const key of keys) lastDrip.delete(key);
         const message = error instanceof Error ? error.message : "failed to send faucet transaction";
         app.log.error({ error, msg: message }, "failed to send faucet transaction");
         return reply.status(503).send({ error: "rpc_unavailable", message: "Solana RPC unavailable. Please try again later.", statusCode: 503 });

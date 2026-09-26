@@ -16,6 +16,7 @@ import type {
   VoteInput,
   WithdrawInput,
 } from "atlas-types";
+import { bs58Encode } from "./format";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -69,6 +70,28 @@ export function buildSignatureHeaders(input: {
   };
 }
 
+export type SignedAuth = { owner: string; nonce: string; signature: string };
+
+/**
+ * Wallet-signs `payload` for a privileged API call (spec §7.1): the wallet signs
+ * "atlas.request v1\nowner\nnonce\nsha256(JSON body)". Send the exact same
+ * `payload` object as the request body.
+ */
+export async function signRequest(
+  owner: string,
+  payload: unknown,
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>,
+): Promise<SignedAuth> {
+  const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(payload)));
+  const payloadSha256 = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const message = ["atlas.request v1", owner, nonce, payloadSha256].join("\n");
+  const signature = bs58Encode(await signMessage(new TextEncoder().encode(message)));
+  return { owner, nonce, signature };
+}
+
 export type InvestAction = "deposit" | "request_withdraw" | "settle_withdraw";
 
 /** Backend-assembled on-chain transaction awaiting a wallet signature. */
@@ -116,10 +139,10 @@ export const api = {
     get<GovernanceProposal[]>("/api/v1/governance/proposals"),
   proposal: async (id: string): Promise<GovernanceProposal | null> =>
     (await get<GovernanceProposal>(`/api/v1/governance/proposals/${id}`)) ?? null,
-  createProposal: async (input: ProposalInput): Promise<GovernanceProposal> =>
-    post<GovernanceProposal>("/api/v1/governance/proposals", input),
-  castVote: async (id: string, vote: VoteInput): Promise<GovernanceProposal> =>
-    post<GovernanceProposal>(`/api/v1/governance/proposals/${id}/votes`, vote),
+  createProposal: async (input: ProposalInput, auth: SignedAuth): Promise<GovernanceProposal> =>
+    post<GovernanceProposal>("/api/v1/governance/proposals", input, buildSignatureHeaders(auth)),
+  castVote: async (id: string, vote: VoteInput, auth: SignedAuth): Promise<GovernanceProposal> =>
+    post<GovernanceProposal>(`/api/v1/governance/proposals/${id}/votes`, vote, buildSignatureHeaders(auth)),
   executeProposal: async (id: string, executor: string): Promise<{ signature: string; proposalId: string; status: string }> =>
     post<{ signature: string; proposalId: string; status: string }>(
       `/api/v1/governance/proposals/${id}/execute`,
